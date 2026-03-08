@@ -83,8 +83,8 @@ func (c *Client) CreateMessagesWithFile(workspaceID, sessionID string, req Messa
 	// Build headers with Content-Type
 	headers := make(http.Header)
 	headers.Set("Content-Type", writer.FormDataContentType())
-	// Make request with string body (multipart data)
-	if _, err = c.request(http.MethodPost, requestURL, headers, bodyBuffer.String(), &result); err != nil {
+	// Make request with bytes.Buffer body (multipart data)
+	if _, err = c.request(http.MethodPost, requestURL, headers, bodyBuffer, &result); err != nil {
 		err = fmt.Errorf("failed to upload file and create messages: %w", err)
 		return
 	}
@@ -106,7 +106,7 @@ func (c *Client) GetMessage(workspaceID, sessionID, messageID string) (result *M
 }
 
 // https://docs.honcho.dev/v3/api-reference/endpoint/messages/get-messages
-func (c *Client) GetMessages(workspaceID, sessionID string, options *GetMessagesOptions, req *MessageGet) (result *PageMessage, err error) {
+func (c *Client) GetMessages(workspaceID, sessionID string, req *MessageGet, options *GetMessagesOptions) (result *PageMessage, err error) {
 	// Construct URL
 	requestURL := c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "sessions", sessionID, "messages", "list")
 	// Add query parameters
@@ -135,10 +135,6 @@ func (c *Client) GetMessages(workspaceID, sessionID string, options *GetMessages
 
 // https://docs.honcho.dev/v3/api-reference/endpoint/messages/update-message
 func (c *Client) UpdateMessage(workspaceID, sessionID, messageID string, req MessageUpdate) (result *Message, err error) {
-	// Validate request
-	if err = req.Validate(); err != nil {
-		return
-	}
 	// Construct URL
 	requestURL := c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "sessions", sessionID, "messages", messageID)
 	// Initialize result

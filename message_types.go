@@ -2,6 +2,7 @@ package honcho
 
 import (
 	"errors"
+	"fmt"
 	"time"
 )
 
@@ -70,7 +71,7 @@ func (req MessageBatchCreate) Validate() error {
 	// Validate each message
 	for i, msg := range req.Messages {
 		if err := msg.Validate(); err != nil {
-			return errors.New("message " + string(rune(i+1)) + ": " + err.Error())
+			return fmt.Errorf("message %d: %w", i+1, err)
 		}
 	}
 	return nil
@@ -84,14 +85,8 @@ type MessageGet struct {
 
 // MessageUpdate represents the request body for updating a message
 type MessageUpdate struct {
-	// Metadata is the metadata to update (required, will overwrite existing metadata)
+	// Metadata is optional metadata to update (will overwrite existing metadata)
 	Metadata map[string]any `json:"metadata,omitempty"`
-}
-
-// Validate checks that mandatory fields are valid
-func (req MessageUpdate) Validate() error {
-	// Metadata is the only field and it's optional, so no validation needed
-	return nil
 }
 
 // MessageConfiguration represents the configuration options for a message

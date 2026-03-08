@@ -195,6 +195,22 @@ func (c *Client) MethodName(req RequestType) (result *ResultType, err error) {
 }
 ```
 
+### Method Signature Patterns
+
+**Check existing similar methods for parameter order consistency:**
+
+```go
+// ✅ Match the pattern used in similar methods (e.g., session.go)
+// When a method has both request body and options parameters:
+func (c *Client) GetSessions(workspaceID string, req *SessionGet, opts *GetSessionsOptions) (result *PageSession, err error)
+//                                          ^^^ request body first         ^^^^ options second
+
+// ❌ Don't invent new parameter orderings - check existing methods first
+func (c *Client) GetSessions(workspaceID string, opts *GetSessionsOptions, req *SessionGet) // wrong order!
+```
+
+**Pattern:** Request body parameters come BEFORE optional query parameter structs. This matches the API structure (body is primary, query params are modifiers).
+
 ---
 
 ## Coding Style
@@ -235,6 +251,16 @@ err = fmt.Errorf("failed to execute request: %w", err)
 if err != nil {
     return
 }
+
+// ✅ Use fmt.Errorf with %w for error message formatting in loops
+for i, msg := range req.Messages {
+    if err := msg.Validate(); err != nil {
+        return fmt.Errorf("message %d: %w", i+1, err)  // preserves error chain
+    }
+}
+
+// ❌ Don't use string concatenation or string(rune()) for error messages
+return errors.New("message " + string(rune(i+1)) + ": " + err.Error())  // breaks for i>=9!
 ```
 
 ### Error Types
@@ -293,7 +319,15 @@ func (req CreateWorkspaceRequest) Validate() error {
 }
 
 // ❌ Don't validate optional parameters (let server handle those)
+
+// ❌ Don't add Validate() if ALL fields are optional - remove the method entirely
+type MessageUpdate struct {
+    Metadata map[string]any `json:"metadata,omitempty"`  // only field, and it's optional
+}
+// No Validate() method needed - caller can pass empty struct
 ```
+
+**Rule:** If a request type has ONLY optional fields (all fields have `omitempty`), do NOT add a `Validate()` method. The method should be omitted entirely, not return `nil`.
 
 ### Call Validation in Methods
 
@@ -424,7 +458,78 @@ body := url.Values{"key": []string{"value"}}
 
 // ✅ Struct/Map (application/json) - default
 body := MyStruct{Field: "value"}
+
+// ✅ io.Reader for multipart/form-data or binary data
+body := &bytes.Buffer{}  // *bytes.Buffer implements io.Reader
 ```
+
+**Important for multipart forms:** The `request()` method detects `io.Reader` types (like `*bytes.Buffer`) and passes them directly as the request body without modification. This preserves binary data integrity for multipart forms.
+
+### Multipart Form Handling
+
+**When the API requires multipart/form-data (e.g., file uploads):**
+
+```go
+// ✅ Complete multipart form pattern
+func (c *Client) CreateMessagesWithFile(workspaceID, sessionID string, req MessageUpload) (result []*Message, err error) {
+    // Validate request
+    if err = req.Validate(); err != nil {
+        return
+    }
+    // Construct URL
+    requestURL := c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "sessions", sessionID, "messages", "upload")
+    // Build multipart form
+    bodyBuffer := &bytes.Buffer{}
+    writer := multipart.NewWriter(bodyBuffer)
+    // Add file field
+    fileWriter, err := writer.CreateFormFile("file", req.Filename)
+    if err != nil {
+        err = fmt.Errorf("failed to create form file: %w", err)
+        return
+    }
+    if _, err = fileWriter.Write(req.File); err != nil {
+        err = fmt.Errorf("failed to write file to form: %w", err)
+        return
+    }
+    // Add other form fields
+    if err = writer.WriteField("peer_id", req.PeerID); err != nil {
+        err = fmt.Errorf("failed to write peer_id field: %w", err)
+        return
+    }
+    // Close multipart writer BEFORE making request
+    if err = writer.Close(); err != nil {
+        err = fmt.Errorf("failed to close multipart writer: %w", err)
+        return
+    }
+    // Build headers with Content-Type (includes boundary)
+    headers := make(http.Header)
+    headers.Set("Content-Type", writer.FormDataContentType())
+    // Make request - pass bytes.Buffer (implements io.Reader)
+    // request() detects io.Reader and uses it directly without modification
+    // Content-Type header with boundary is preserved
+    if _, err = c.request(http.MethodPost, requestURL, headers, bodyBuffer, &result); err != nil {
+        err = fmt.Errorf("failed to upload file: %w", err)
+        return
+    }
+    return
+}
+
+// ❌ Don't convert multipart buffer to string - loses binary data integrity
+if _, err = c.request(http.MethodPost, requestURL, headers, bodyBuffer.String(), &result); err != nil {
+
+// ❌ Don't forget to close the multipart writer before making request
+// ❌ Don't forget to set Content-Type header with writer.FormDataContentType()
+```
+
+**Key points for multipart forms:**
+1. Use `bytes.Buffer` to collect multipart data
+2. Use `multipart.NewWriter` to build the form
+3. Add all fields (files and regular fields) to the writer
+4. **Close the writer** before making the request (finalizes the form)
+5. Set `Content-Type` header using `writer.FormDataContentType()` (includes boundary)
+6. Pass `bytes.Buffer` directly to `request()` - it implements `io.Reader`
+7. **Never** convert to string with `buffer.String()` - binary data will be corrupted
+8. **How it works:** `request()` detects `io.Reader` types in the body switch and uses them directly, preserving the Content-Type header with boundary parameter
 
 ### Supported Result Types
 
@@ -542,6 +647,9 @@ grep "type.*struct" peer.go        # Should find nothing
 - ✅ Validation called at method start (if request has Validate())
 - ✅ Uses `workspaceBaseURI` constant (not hardcoded URLs)
 - ✅ Uses `c.request()` method (not `http.Client.Do()`)
+- ✅ Error messages in loops use `fmt.Errorf("item %d: %w", index, err)` (not string concatenation)
+- ✅ Multipart forms pass `bytes.Buffer` directly (not `buffer.String()`)
+- ✅ Method signature parameter order matches existing patterns (req before options)
 
 **For each struct:**
 - ✅ All fields have documentation comments
@@ -549,6 +657,7 @@ grep "type.*struct" peer.go        # Should find nothing
 - ✅ Constraints documented (min/max, patterns, lengths)
 - ✅ Uses `any` not `interface{}`
 - ✅ Optional nested structs use pointers with `omitempty`
+- ✅ No `Validate()` method if ALL fields are optional (remove it entirely)
 
 ### Completeness Check
 
@@ -588,6 +697,10 @@ grep "type.*struct" peer.go        # Should find nothing
 - ✅ Give error types an `Error()` method and wrap with `%w`
 - ✅ Use `https://docs.honcho.dev/llms.txt` to discover all endpoints
 - ✅ Run the implementation verification checklist before considering work complete
+- ✅ Use `fmt.Errorf("item %d: %w", index, err)` for error messages in loops (not string concatenation)
+- ✅ Pass `bytes.Buffer` directly to `request()` for multipart forms (not `buffer.String()`)
+- ✅ Match method signature parameter order with existing patterns (req before options)
+- ✅ Omit `Validate()` method entirely if ALL struct fields are optional
 
 ### DON'T:
 
@@ -609,3 +722,7 @@ grep "type.*struct" peer.go        # Should find nothing
 - ❌ Ignore error schemas or HTTP status codes from the API docs
 - ❌ Return error types without `Error()` method
 - ❌ Consider implementation complete without running the verification checklist
+- ❌ Use string concatenation or `string(rune())` for error messages in loops (use `fmt.Errorf` with `%w`)
+- ❌ Convert multipart `bytes.Buffer` to string with `buffer.String()` (pass buffer directly)
+- ❌ Invent new parameter orderings - check existing methods for consistency (req before options)
+- ❌ Add `Validate()` method when ALL fields are optional (omit it entirely)

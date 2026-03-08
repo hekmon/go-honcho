@@ -14,26 +14,38 @@ import (
 func (c *Client) request(method string, requestURL *url.URL, headers http.Header, body, result any) (responseHeaders http.Header, err error) {
 	// Build request
 	var (
-		contentType string
-		bodyBuffer  bytes.Buffer
+		bodyReader io.Reader
+		bodyBuffer bytes.Buffer
 	)
 	if body != nil {
 		switch typed := body.(type) {
 		case string:
 			bodyBuffer.WriteString(typed)
-			contentType = "text/plain; charset=utf-8"
+			headers = setContentType(headers, "text/plain; charset=utf-8")
 		case url.Values:
 			bodyBuffer.WriteString(typed.Encode())
-			contentType = "application/x-www-form-urlencoded"
+			headers = setContentType(headers, "application/x-www-form-urlencoded")
+		case io.Reader:
+			// io.Reader (e.g., *bytes.Buffer for multipart forms)
+			// Headers must be set manually to include Content-Type with boundary
+			bodyReader = typed
+			if headers == nil || headers.Get("Content-Type") == "" {
+				err = errors.New("headers must be set with Content-Type when body is io.Reader")
+				return
+			}
 		default:
 			if err = json.NewEncoder(&bodyBuffer).Encode(body); err != nil {
 				err = fmt.Errorf("failed to encode body: %s", err)
 				return
 			}
-			contentType = "application/json; charset=utf-8"
+			headers = setContentType(headers, "application/json; charset=utf-8")
 		}
 	}
-	req, err := http.NewRequest(method, requestURL.String(), &bodyBuffer)
+	// Set body reader
+	if bodyReader == nil {
+		bodyReader = &bodyBuffer
+	}
+	req, err := http.NewRequest(method, requestURL.String(), bodyReader)
 	if err != nil {
 		err = fmt.Errorf("failed to build request: %s", err)
 		return
@@ -41,9 +53,6 @@ func (c *Client) request(method string, requestURL *url.URL, headers http.Header
 	// Set headers
 	if headers != nil {
 		req.Header = headers
-	}
-	if contentType != "" {
-		req.Header.Set("Content-Type", contentType)
 	}
 	switch result.(type) {
 	case nil, *bytes.Buffer:
@@ -120,6 +129,17 @@ func (c *Client) request(method string, requestURL *url.URL, headers http.Header
 		err = fmt.Errorf("unsupported result type: %T", result)
 	}
 	return
+}
+
+// setContentType sets the Content-Type header, preserving existing value if present
+func setContentType(headers http.Header, contentType string) http.Header {
+	if headers == nil {
+		headers = make(http.Header)
+	}
+	if headers.Get("Content-Type") == "" {
+		headers.Set("Content-Type", contentType)
+	}
+	return headers
 }
 
 // HTTPValidationError represents a 422 validation error response
