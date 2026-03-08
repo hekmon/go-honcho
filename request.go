@@ -51,6 +51,9 @@ func (c *Client) request(method string, requestURL *url.URL, headers http.Header
 	default:
 		req.Header.Set("Accept", "application/json")
 	}
+	if c.apiKey != "" {
+		req.Header.Set("Authorization", "Bearer "+c.apiKey)
+	}
 	// Execute request
 	resp, err := c.http.Do(req)
 	if err != nil {
