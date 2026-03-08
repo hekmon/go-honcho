@@ -106,37 +106,47 @@ go-honcho/
 
 ### Basic Setup
 
-**Initialize the client with your API key and base URL:**
+**Initialize the client using `honcho.New()` with an `Options` struct:**
 
 ```go
 import "github.com/hekmon/go-honcho"
 
-// ✅ Basic initialization
-client, err := honcho.NewClient("your-api-key", "https://api.honcho.dev")
-if err != nil {
-    // handle error
-}
+// ✅ Basic initialization with API key
+client := honcho.New(&honcho.Options{
+    APIKey: "your-api-key",
+})
 
 // ✅ Use environment variable for API key (recommended)
 apiKey := os.Getenv("HONCHO_API_KEY")
-client, err := honcho.NewClient(apiKey, "https://api.honcho.dev")
+client := honcho.New(&honcho.Options{
+    APIKey: apiKey,
+})
 ```
 
 ### Client Configuration
 
-**The `NewClient` function signature:**
+**The `New` function signature:**
 
 ```go
-func NewClient(apiKey, baseURL string) (*Client, error)
+func New(options *Options) *Client
+```
+
+**Options struct:**
+```go
+type Options struct {
+    BaseURL *url.URL     // if nil, defaults to https://api.honcho.dev
+    APIKey  string       // if empty, authorization header will not be set
+    HTTP    *http.Client // if nil, defaults to cleanhttp.DefaultPooledClient()
+}
 ```
 
 **Parameters:**
-- `apiKey`: Your Honcho API key (required, can be empty string for public endpoints)
-- `baseURL`: The base URL for the API (e.g., "https://api.honcho.dev")
+- `options.BaseURL`: The base URL for the API (optional, defaults to `https://api.honcho.dev`)
+- `options.APIKey`: Your Honcho API key (optional for self-hosted instances)
+- `options.HTTP`: Custom HTTP client (optional, for custom timeouts/transport)
 
 **Returns:**
-- `*Client`: Configured client instance
-- `error`: Error if URL parsing fails
+- `*Client`: Configured client instance (no error returned)
 
 ### Custom HTTP Client
 
@@ -153,7 +163,10 @@ httpClient := &http.Client{
     },
 }
 
-client, err := honcho.NewClientWithHTTP(apiKey, baseURL, httpClient)
+client := honcho.New(&honcho.Options{
+    APIKey: apiKey,
+    HTTP:   httpClient,
+})
 ```
 
 **Common HTTP client configurations:**
@@ -188,12 +201,17 @@ httpClient := &http.Client{
 var client *honcho.Client
 
 func init() {
-    client, _ = honcho.NewClient(apiKey, baseURL)
+    client = honcho.New(&honcho.Options{
+        APIKey: os.Getenv("HONCHO_API_KEY"),
+    })
 }
 
 // Use the same client instance across goroutines
 go func() {
-    workspace, _ := client.GetOrCreateWorkspace(req)
+    workspace, err := client.GetOrCreateWorkspace(honcho.CreateWorkspaceRequest{ID: "my-workspace"})
+    if err != nil {
+        // handle error
+    }
 }()
 ```
 
@@ -201,8 +219,13 @@ go func() {
 
 ```go
 // ✅ Create separate clients for different workspaces/environments
-prodClient, _ := honcho.NewClient(prodAPIKey, "https://api.honcho.dev")
-devClient, _ := honcho.NewClient(devAPIKey, "https://dev.honcho.dev")
+prodClient := honcho.New(&honcho.Options{
+    APIKey: prodAPIKey,
+})
+devClient := honcho.New(&honcho.Options{
+    APIKey: devAPIKey,
+    BaseURL: devBaseURL,
+})
 ```
 
 ### Environment Variables
@@ -211,7 +234,7 @@ devClient, _ := honcho.NewClient(devAPIKey, "https://dev.honcho.dev")
 
 ```go
 // ✅ Recommended environment variables
-HONCHO_API_KEY      // Your Honcho API key (required)
+HONCHO_API_KEY      // Your Honcho API key (required for managed service)
 HONCHO_BASE_URL     // API base URL (optional, defaults to https://api.honcho.dev)
 HONCHO_TIMEOUT      // HTTP timeout in seconds (optional, defaults to 30)
 ```
@@ -225,21 +248,28 @@ if apiKey == "" {
     log.Fatal("HONCHO_API_KEY environment variable is required")
 }
 
-baseURL := os.Getenv("HONCHO_BASE_URL")
-if baseURL == "" {
-    baseURL = "https://api.honcho.dev"
+var baseURL *url.URL
+if baseURLStr := os.Getenv("HONCHO_BASE_URL"); baseURLStr != "" {
+    var err error
+    baseURL, err = url.Parse(baseURLStr)
+    if err != nil {
+        log.Fatalf("Invalid HONCHO_BASE_URL: %v", err)
+    }
 }
 
-timeoutStr := os.Getenv("HONCHO_TIMEOUT")
 timeout := 30 * time.Second
-if timeoutStr != "" {
+if timeoutStr := os.Getenv("HONCHO_TIMEOUT"); timeoutStr != "" {
     if seconds, err := strconv.Atoi(timeoutStr); err == nil {
         timeout = time.Duration(seconds) * time.Second
     }
 }
 
 httpClient := &http.Client{Timeout: timeout}
-client, err := honcho.NewClientWithHTTP(apiKey, baseURL, httpClient)
+client := honcho.New(&honcho.Options{
+    APIKey:  apiKey,
+    BaseURL: baseURL,
+    HTTP:    httpClient,
+})
 ```
 
 **Configuration file example (.env):**
@@ -249,53 +279,6 @@ client, err := honcho.NewClientWithHTTP(apiKey, baseURL, httpClient)
 HONCHO_API_KEY=your-api-key-here
 HONCHO_BASE_URL=https://api.honcho.dev
 HONCHO_TIMEOUT=30
-```
-
-### Configuration Management
-
-**For applications with complex configuration needs:**
-
-```go
-// ✅ Configuration struct for managing settings
-type Config struct {
-    APIKey   string
-    BaseURL  string
-    Timeout  time.Duration
-    LogLevel string
-}
-
-// LoadFromEnv loads configuration from environment variables
-func LoadFromEnv() (*Config, error) {
-    cfg := &Config{
-        APIKey:   os.Getenv("HONCHO_API_KEY"),
-        BaseURL:  os.Getenv("HONCHO_BASE_URL"),
-        LogLevel: os.Getenv("HONCHO_LOG_LEVEL"),
-    }
-    
-    if cfg.APIKey == "" {
-        return nil, errors.New("HONCHO_API_KEY is required")
-    }
-    
-    if cfg.BaseURL == "" {
-        cfg.BaseURL = "https://api.honcho.dev"
-    }
-    
-    timeoutStr := os.Getenv("HONCHO_TIMEOUT")
-    cfg.Timeout = 30 * time.Second
-    if timeoutStr != "" {
-        if seconds, err := strconv.Atoi(timeoutStr); err == nil {
-            cfg.Timeout = time.Duration(seconds) * time.Second
-        }
-    }
-    
-    return cfg, nil
-}
-
-// NewClientFromConfig creates a client from configuration
-func NewClientFromConfig(cfg *Config) (*honcho.Client, error) {
-    httpClient := &http.Client{Timeout: cfg.Timeout}
-    return honcho.NewClientWithHTTP(cfg.APIKey, cfg.BaseURL, httpClient)
-}
 ```
 
 ### Best Practices
@@ -317,7 +300,7 @@ func NewClientFromConfig(cfg *Config) (*honcho.Client, error) {
 - ❌ Don't commit `.env` files to version control
 
 **Error Handling:**
-- ✅ Check error from `NewClient()` during initialization
+- ✅ Validate environment variables at startup
 - ✅ Log client initialization failures at startup
 - ✅ Use meaningful error messages for debugging
 - ✅ Fail fast on missing required configuration
