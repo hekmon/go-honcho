@@ -114,11 +114,11 @@ type PageMessage struct {
 // GetMessagesOptions represents optional parameters for GetMessages
 type GetMessagesOptions struct {
 	// Reverse indicates whether to reverse the order of results (default: false)
-	Reverse *bool
+	Reverse bool `json:"reverse,omitempty"`
 	// Page is the page number (default: 1, minimum: 1)
-	Page int
+	Page int `json:"page,omitempty"`
 	// Size is the page size (default: 50, minimum: 1, maximum: 100)
-	Size int
+	Size int `json:"size,omitempty"`
 }
 
 // MessageUpload represents the request body for uploading a file to create messages

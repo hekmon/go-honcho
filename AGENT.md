@@ -63,6 +63,17 @@ Need to distinguish "not provided" from "zero value"?
 └─ NO → Use value type (int, bool) with omitempty (0 = use default)
 ```
 
+**Pointer vs Value type for boolean fields?**
+```
+Is it a boolean field?
+├─ YES → Is it pagination/filter options (false = server default)?
+│  ├─ YES → Use bool with omitempty (e.g., Reverse bool)
+│  └─ NO → Is it configuration update (need "don't change" option)?
+│     ├─ YES → Use *bool with omitempty (nil = keep existing)
+│     └─ NO → Use bool with omitempty (false = default)
+└─ NO → Follow pointer vs value decision above
+```
+
 ---
 
 ## Introduction
@@ -374,23 +385,36 @@ grep "type Peer" peer.go        # Should find nothing
 **Use pointer (`*int`, `*bool`, `*string`) when:**
 - You need to distinguish between "not provided" (nil) and "explicitly set to zero value"
 - The field is truly optional with no meaningful default
+- For `*bool`: when you need 3-way logic (nil = "don't change", true = "enable", false = "disable")
 
 ```go
 // ✅ Pointer distinguishes nil vs 0
 type GetPeerContextOptions struct {
     SearchTopK *int `json:"search_top_k,omitempty"`  // nil = not provided, 0 = explicitly zero
 }
+
+// ✅ Pointer for bool when you need 3-way logic (configuration updates)
+type SessionPeerConfig struct {
+    ObserveMe *bool `json:"observe_me,omitempty"`  // nil = keep existing, true/false = change
+}
 ```
 
 **Use value type (`int`, `bool`) with `omitempty` when:**
 - Zero value (0, false) should mean "use server default"
 - No need to distinguish between nil and zero
+- For `bool`: when false is the server default and you never need to explicitly send false
 
 ```go
 // ✅ Value type with omitempty: 0 means "use default"
 type ConclusionQuery struct {
     // TopK is the number of results to return (0=use default: 10, min: 1, max: 100)
     TopK int `json:"top_k,omitempty"`  // 0 omitted from JSON, server uses default (10)
+}
+
+// ✅ bool with omitempty: false means "use default" (pagination, filters)
+type GetMessagesOptions struct {
+    // Reverse is whether to reverse the order of results (default: false)
+    Reverse bool `json:"reverse,omitempty"`  // false omitted, true sent
 }
 ```
 
@@ -400,6 +424,9 @@ TopK *int `json:"top_k,omitempty"`  // forces caller to use &value instead of ju
 
 // ❌ Don't use value type when you need to distinguish nil from 0
 SearchTopK int `json:"search_top_k,omitempty"`  // can't tell if 0 means "not set" or "set to 0"
+
+// ❌ Don't use *bool for simple boolean flags where false = default
+Reverse *bool `json:"reverse,omitempty"`  // unnecessarily complex for pagination
 ```
 
 ---
@@ -699,8 +726,9 @@ func (c *Client) GetSessions(workspaceID string, opts *GetSessionsOptions) (resu
         if opts.Size > 0 {
             query.Set("size", strconv.Itoa(opts.Size))
         }
-        if opts.Reverse != nil {
-            query.Set("reverse", strconv.FormatBool(*opts.Reverse))
+        // ✅ For bool fields with omitempty: check value directly
+        if opts.Reverse {
+            query.Set("reverse", "true")
         }
         requestURL.RawQuery = query.Encode()
     }
@@ -807,11 +835,11 @@ type PageSession struct {
 // ✅ Pagination in options struct
 type GetSessionsOptions struct {
     // Page is the page number (default: 1, minimum: 1)
-    Page int
+    Page int `json:"page,omitempty"`
     // Size is the page size (default: 50, minimum: 1, maximum: 100)
-    Size int
+    Size int `json:"size,omitempty"`
     // Reverse is whether to reverse the order of results (default: false)
-    Reverse *bool  // nil = use server default
+    Reverse bool `json:"reverse,omitempty"`  // false = use server default
 }
 ```
 
@@ -820,9 +848,10 @@ type GetSessionsOptions struct {
 - ✅ Include pagination metadata in response (page, size, total_count, total_pages)
 - ✅ Document default values and constraints for pagination parameters
 - ✅ Use value types for Page/Size with `omitempty` (0 = use server default)
-- ✅ Use pointer types for boolean flags (nil = use server default)
+- ✅ Use `bool` with `omitempty` for Reverse (false = use server default)
+- ✅ Simplify query parameter handling: `if opts.Reverse { query.Set("reverse", "true") }`
 - ❌ Don't omit pagination metadata from response types
-- ❌ Don't use pointer types for Page/Size unless you need to distinguish nil from 0
+- ❌ Don't use pointer types for Page/Size/Reverse in pagination options
 
 ---
 
@@ -1287,16 +1316,25 @@ type ConclusionQuery struct {
     Distance *float64 `json:"distance,omitempty"`
 }
 
-// ✅ Document pointer defaults clearly
+// ✅ Document value type defaults clearly
 type ListConclusionsOptions struct {
     // Reverse is whether to reverse the order of results (default: false)
-    Reverse *bool  // nil = use server default (false)
+    Reverse bool `json:"reverse,omitempty"`  // false = use server default
     
     // Page is the page number (default: 1, minimum: 1)
-    Page int  // 0 = use server default (1)
+    Page int `json:"page,omitempty"`  // 0 = use server default (1)
     
     // Size is the page size (default: 50, minimum: 1, maximum: 100)
-    Size int  // 0 = use server default (50)
+    Size int `json:"size,omitempty"`  // 0 = use server default (50)
+}
+
+// ✅ Document when pointer is needed (3-way logic)
+type SessionPeerConfig struct {
+    // ObserveMe indicates whether to enable observation (optional)
+    ObserveMe *bool `json:"observe_me,omitempty"`  // nil = keep existing, true/false = change
+    
+    // ObserveOthers indicates whether to observe other peers (optional)
+    ObserveOthers *bool `json:"observe_others,omitempty"`  // nil = keep existing
 }
 
 // ❌ Avoid ambiguous documentation
@@ -1304,6 +1342,23 @@ type ListConclusionsOptions struct {
 ```
 
 This is critical for optional parameters where `0` means "use server default".
+
+**Boolean Field Decision Guide:**
+
+```go
+// ✅ Use bool with omitempty for pagination/filters (false = default)
+type GetMessagesOptions struct {
+    Reverse bool `json:"reverse,omitempty"`  // false omitted from JSON
+}
+
+// ✅ Use *bool for configuration updates (need 3-way logic)
+type SessionPeerConfig struct {
+    ObserveMe *bool `json:"observe_me,omitempty"`  // nil = don't change
+}
+
+// ❌ Don't use *bool for simple flags
+Reverse *bool `json:"reverse,omitempty"`  // unnecessarily complex
+```
 
 ---
 

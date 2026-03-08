@@ -65,8 +65,8 @@ func (c *Client) ListConclusions(workspaceID string, req *ConclusionGet, opts *L
 	requestURL := c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "conclusions", "list")
 	query := requestURL.Query()
 	if opts != nil {
-		if opts.Reverse != nil {
-			query.Set("reverse", strconv.FormatBool(*opts.Reverse))
+		if opts.Reverse {
+			query.Set("reverse", "true")
 		}
 		if opts.Page > 0 {
 			query.Set("page", strconv.Itoa(opts.Page))

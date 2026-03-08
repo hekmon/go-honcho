@@ -112,8 +112,8 @@ func (c *Client) GetMessages(workspaceID, sessionID string, req *MessageGet, opt
 	// Add query parameters
 	queryParams := requestURL.Query()
 	if options != nil {
-		if options.Reverse != nil {
-			queryParams.Set("reverse", strconv.FormatBool(*options.Reverse))
+		if options.Reverse {
+			queryParams.Set("reverse", "true")
 		}
 		if options.Page > 0 {
 			queryParams.Set("page", strconv.Itoa(options.Page))
