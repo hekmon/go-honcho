@@ -12,7 +12,8 @@ This document provides comprehensive guidelines for implementing the Honcho Go S
 6. [URL Construction](#url-construction)
 7. [Low-Level Request Method](#low-level-request-method)
 8. [Constants & Imports](#constants--imports)
-9. [Summary](#summary)
+9. [Implementation Verification](#implementation-verification)
+10. [Summary](#summary)
 
 ---
 
@@ -51,6 +52,24 @@ func (c *Client) GetOrCreateWorkspace(req CreateWorkspaceRequest) (result *Works
     // implementation
 }
 ```
+
+### Type Category Verification
+
+**After implementing types, verify they're in the correct category file:**
+
+```bash
+# ✅ Verify session types are in session_types.go
+grep "type Session" session_types.go  # Should find Session*, PageSession, etc.
+grep "type Session" session.go        # Should find nothing
+
+# ✅ Verify peer types are in peer_types.go  
+grep "type Peer" peer_types.go  # Should find Peer*, PagePeer, etc.
+grep "type Peer" peer.go        # Should find nothing
+```
+
+**Shared types:** If a type is used by multiple categories (e.g., `MessageSearchOptions` for both workspace and session search), place it in the **primary category** where it's defined in the API docs, or create a `shared_types.go` if used across 3+ categories.
+
+**❌ Don't leave types in the wrong category file even if they're related** - Sessions and Peers are related but their types belong in separate files.
 
 ### Base URI Constant
 
@@ -286,6 +305,47 @@ func (c *Client) GetOrCreateWorkspace(req CreateWorkspaceRequest) (result *Works
 }
 ```
 
+### Validation Constraint Precision
+
+**Copy exact constraints from the OpenAPI spec - do not approximate:**
+
+```yaml
+# From API docs:
+limit:
+  type: integer
+  maximum: 100
+  minimum: 1  # ← Must match exactly, not 0
+  default: 10
+```
+
+```go
+// ✅ Match the spec exactly
+func (req MessageSearchOptions) Validate() error {
+    if req.Query == "" {
+        return errors.New("query is required")
+    }
+    if req.Limit < 1 || req.Limit > 100 {  // exact min/max from spec
+        return errors.New("limit must be between 1 and 100")
+    }
+    return nil
+}
+
+// ❌ Don't approximate or assume
+func (req MessageSearchOptions) Validate() error {
+    if req.Limit < 0 || req.Limit > 100 {  // wrong minimum!
+        return errors.New("limit must be between 0 and 100")
+    }
+    return nil
+}
+```
+
+**Checklist for Validate() methods:**
+- ✅ Verify all numeric constraints (min/max) against OpenAPI spec
+- ✅ Verify all string constraints (length, pattern) against OpenAPI spec
+- ✅ Verify all required fields match the `required` array in the spec
+- ✅ Don't add validation for optional fields (server handles those)
+- ✅ Copy constraint values directly from the spec, don't guess
+
 ### Struct Field Documentation
 
 **Document default values and constraints for struct fields:**
@@ -432,6 +492,72 @@ import (
 
 ---
 
+## Implementation Verification
+
+**Before considering a category complete, verify all items in this checklist:**
+
+### Type Location Check
+
+```bash
+# All {category} types should be in {category}_types.go
+grep "type.*struct" session_types.go  # Should find Session*, PageSession, etc.
+grep "type.*struct" session.go        # Should find nothing
+
+grep "type.*struct" peer_types.go  # Should find Peer*, PagePeer, etc.
+grep "type.*struct" peer.go        # Should find nothing
+```
+
+**Verify:**
+- ✅ All request types are in `{category}_types.go` (e.g., `SessionCreate`, `SessionUpdate`)
+- ✅ All response types are in `{category}_types.go` (e.g., `Session`, `PageSession`)
+- ✅ All option types are in `{category}_types.go` (e.g., `GetSessionsOptions`)
+- ✅ No struct types are defined in `{category}.go` (methods only)
+- ✅ Types are not mixed between categories (Session types in session_types.go, not peer_types.go)
+
+### API Compliance Check
+
+**For each endpoint:**
+- ✅ HTTP method matches the OpenAPI spec (GET vs POST vs PUT vs DELETE)
+- ✅ URL path structure matches the spec exactly
+- ✅ Request body schema matches the spec (all fields, types, omitempty)
+- ✅ Response body schema matches the spec (all fields, types)
+- ✅ All HTTP status codes are handled (200, 201, 202, 204, 422, etc.)
+- ✅ Error response schemas are implemented (HTTPValidationError, ValidationError)
+
+**Validation precision:**
+- ✅ Numeric constraints (min/max) match the spec exactly
+- ✅ String constraints (length, pattern) match the spec exactly
+- ✅ Required fields match the `required` array in the spec
+- ✅ Default values are documented in struct field comments
+
+### Code Quality Check
+
+**For each method:**
+- ✅ API doc URL in block comment (without `.md` extension)
+- ✅ Named returns used consistently
+- ✅ Naked returns used (no explicit return values)
+- ✅ Errors wrapped with context using `%w`
+- ✅ Validation called at method start (if request has Validate())
+- ✅ Uses `workspaceBaseURI` constant (not hardcoded URLs)
+- ✅ Uses `c.request()` method (not `http.Client.Do()`)
+
+**For each struct:**
+- ✅ All fields have documentation comments
+- ✅ Optional fields have default values documented
+- ✅ Constraints documented (min/max, patterns, lengths)
+- ✅ Uses `any` not `interface{}`
+- ✅ Optional nested structs use pointers with `omitempty`
+
+### Completeness Check
+
+**Using `https://docs.honcho.dev/llms.txt`:**
+- ✅ All endpoints for the category are implemented
+- ✅ No endpoints missing from the API index
+- ✅ All related types are defined
+- ✅ All error types are implemented
+
+---
+
 ## Summary
 
 ### DO:
@@ -440,8 +566,10 @@ import (
 - ✅ Reuse `workspaceBaseURI` constant from `workspace.go` (all endpoints start with `/v3/workspaces`)
 - ✅ Create a new base URI constant only for endpoints that don't start with `/v3/workspaces`
 - ✅ Separate types (`*_types.go`) from methods (`*.go`)
+- ✅ Verify type locations after implementation (session types in session_types.go, etc.)
 - ✅ Use named returns and naked returns
 - ✅ Validate mandatory parameters with `Validate()` methods
+- ✅ Copy validation constraints exactly from the OpenAPI spec (don't approximate)
 - ✅ Use `any` instead of `interface{}`
 - ✅ Use pointers for optional nested structs
 - ✅ Use `baseURL.JoinPath()` for URL construction
@@ -455,14 +583,17 @@ import (
 - ✅ Implement ALL HTTP status codes from the API docs
 - ✅ Give error types an `Error()` method and wrap with `%w`
 - ✅ Use `https://docs.honcho.dev/llms.txt` to discover all endpoints
+- ✅ Run the implementation verification checklist before considering work complete
 
 ### DON'T:
 
 - ❌ Mix categories in the same file
+- ❌ Leave types in the wrong category file (even if related)
 - ❌ Define redundant base URI constants (reuse `workspaceBaseURI` from `workspace.go`)
 - ❌ Omit documentation links for methods
 - ❌ Mix types and methods in the same file
 - ❌ Validate optional parameters (server handles those)
+- ❌ Approximate validation constraints (copy exact min/max from spec)
 - ❌ Hardcode full URLs
 - ❌ Use `interface{}` (use `any`)
 - ❌ Use value types for optional nested structs
@@ -472,3 +603,4 @@ import (
 - ❌ Leave struct fields undocumented (especially optional params)
 - ❌ Ignore error schemas or HTTP status codes from the API docs
 - ❌ Return error types without `Error()` method
+- ❌ Consider implementation complete without running the verification checklist
