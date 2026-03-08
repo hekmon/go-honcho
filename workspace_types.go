@@ -138,8 +138,8 @@ func (req MessageSearchOptions) Validate() error {
 	if req.Query == "" {
 		return errors.New("query is required")
 	}
-	if req.Limit < 0 || req.Limit > 100 {
-		return errors.New("limit must be between 0 and 100")
+	if req.Limit < 1 || req.Limit > 100 {
+		return errors.New("limit must be between 1 and 100")
 	}
 	return nil
 }

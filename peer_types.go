@@ -119,21 +119,6 @@ type Session struct {
 	CreatedAt     time.Time      `json:"created_at"`
 }
 
-// SessionGet represents the request body for getting sessions with filters
-// Use nil for no filters
-type SessionGet struct {
-	Filters map[string]any `json:"filters,omitempty"`
-}
-
-// PageSession represents a paginated response of sessions
-type PageSession struct {
-	Items []Session `json:"items"`
-	Total int       `json:"total"`
-	Page  int       `json:"page"`
-	Size  int       `json:"size"`
-	Pages int       `json:"pages"`
-}
-
 // GetAllPeersOptions represents optional parameters for GetAllPeers
 type GetAllPeersOptions struct {
 	Page int // Page is the page number (default: 1, minimum: 1)
