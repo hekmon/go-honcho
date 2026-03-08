@@ -5,15 +5,14 @@ This document provides comprehensive guidelines for implementing the Honcho Go S
 ## Table of Contents
 
 1. [File Organization](#file-organization)
-2. [Documentation & API Discovery](#documentation--api-discovery)
-3. [Implementation Pattern](#implementation-pattern)
-4. [Coding Style](#coding-style)
-5. [Validation](#validation)
-6. [URL Construction](#url-construction)
+2. [Constants & Shared Resources](#constants--shared-resources)
+3. [Documentation & API Discovery](#documentation--api-discovery)
+4. [Implementation Pattern](#implementation-pattern)
+5. [Coding Style](#coding-style)
+6. [Validation](#validation)
 7. [Low-Level Request Method](#low-level-request-method)
-8. [Constants & Imports](#constants--imports)
-9. [Implementation Verification](#implementation-verification)
-10. [Summary](#summary)
+8. [Implementation Verification](#implementation-verification)
+9. [Quick Reference](#quick-reference)
 
 ---
 
@@ -73,20 +72,89 @@ grep "type Peer" peer.go        # Should find nothing
 
 **Canonical type location:** When implementing a new category, define all types for that category in `{category}_types.go`, even if they were previously defined elsewhere. For example, when implementing the messages category, the `Message` struct should be defined in `message_types.go`, not in `workspace_types.go` where it might have been used before. Other categories should then reuse the type from its canonical home.
 
+### Pointer vs Value Type Decision Guide
+
+**Use pointer (`*int`, `*bool`, `*string`) when:**
+- You need to distinguish between "not provided" (nil) and "explicitly set to zero value"
+- The field is truly optional with no meaningful default
+
+```go
+// ✅ Pointer distinguishes nil vs 0
+type GetPeerContextOptions struct {
+    SearchTopK *int `json:"search_top_k,omitempty"`  // nil = not provided, 0 = explicitly zero
+}
+```
+
+**Use value type (`int`, `bool`) with `omitempty` when:**
+- Zero value (0, false) should mean "use server default"
+- No need to distinguish between nil and zero
+
+```go
+// ✅ Value type with omitempty: 0 means "use default"
+type ConclusionQuery struct {
+    // TopK is the number of results to return (0=use default: 10, min: 1, max: 100)
+    TopK int `json:"top_k,omitempty"`  // 0 omitted from JSON, server uses default (10)
+}
+```
+
+```go
+// ❌ Don't use pointer when 0 should mean "use default"
+TopK *int `json:"top_k,omitempty"`  // forces caller to use &value instead of just value
+
+// ❌ Don't use value type when you need to distinguish nil from 0
+SearchTopK int `json:"search_top_k,omitempty"`  // can't tell if 0 means "not set" or "set to 0"
+```
+
+---
+
+## Constants & Shared Resources
+
 ### Base URI Constant
 
-**All API endpoints share the same base URI `/v3/workspaces`. Use the `workspaceBaseURI` constant from `workspace.go` in all category files:**
+**All API endpoints share the same base URI `/v3/workspaces`. Define `workspaceBaseURI` once and reuse it in all category files:**
 
 **Note:** If you encounter an endpoint that does NOT start with `/v3/workspaces`, create a new constant for that specific base path.
 
 ```go
+// ✅ In workspace.go - define once
+const (
+    workspaceBaseURI = "/v3/workspaces"
+)
+
 // ✅ In peer.go, session.go, etc. - reuse workspaceBaseURI
 requestURL := c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "peers")
 
-// ❌ Don't define a new constant per category
+// ❌ Don't define redundant constants per category
 const (
     peerBaseURI = "/v3/workspaces"  // redundant!
 )
+
+// ❌ Don't create new constants unnecessarily - only for truly different base paths
+const (
+    peerBaseURI = "/v3/workspaces/peers"  // wrong! this is just a path extension
+)
+```
+
+### Pattern Definitions
+
+```go
+// ✅ Define regex patterns as package-level variables
+var workspaceIDPattern = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
+```
+
+### Clean Imports
+
+```go
+// ✅ Group standard library imports
+import (
+    "errors"
+    "fmt"
+    "net/http"
+    "regexp"
+    "time"
+)
+
+// ❌ Avoid unused imports
 ```
 
 ---
@@ -268,7 +336,7 @@ return result, nil
 
 ```go
 // ✅ Wrap errors with context and use %w for chaining
-err = fmt.Errorf("failed to parse URL: %s", err)
+err = fmt.Errorf("failed to parse URL: %w", err)
 err = fmt.Errorf("failed to execute request: %w", err)
 
 // ✅ Check errors immediately and return early
@@ -317,38 +385,6 @@ Configuration *WorkspaceConfiguration `json:"configuration,omitempty"`
 
 // ❌ Avoid value types for optional nested structs
 Configuration WorkspaceConfiguration `json:"configuration,omitempty"`
-```
-
-### Pointer vs Value Type Decision Guide
-
-**Use pointer (`*int`, `*bool`, `*string`) when:**
-- You need to distinguish between "not provided" (nil) and "explicitly set to zero value"
-- The field is truly optional with no meaningful default
-
-```go
-// ✅ Pointer distinguishes nil vs 0
-type GetPeerContextOptions struct {
-    SearchTopK *int `json:"search_top_k,omitempty"`  // nil = not provided, 0 = explicitly zero
-}
-```
-
-**Use value type (`int`, `bool`) with `omitempty` when:**
-- Zero value (0, false) should mean "use server default"
-- No need to distinguish between nil and zero
-
-```go
-// ✅ Value type with omitempty: 0 means "use default"
-type ConclusionQuery struct {
-    TopK int `json:"top_k,omitempty"`  // 0 omitted from JSON, server uses default (10)
-}
-```
-
-```go
-// ❌ Don't use pointer when 0 should mean "use default"
-TopK *int `json:"top_k,omitempty"`  // forces caller to use &value instead of just value
-
-// ❌ Don't use value type when you need to distinguish nil from 0
-SearchTopK int `json:"search_top_k,omitempty"`  // can't tell if 0 means "not set" or "set to 0"
 ```
 
 ---
@@ -568,39 +604,6 @@ This is critical for optional parameters where `0` means "use server default".
 
 ---
 
-## URL Construction
-
-### Endpoint Paths
-
-```go
-// ✅ Use workspaceBaseURI constant (defined in workspace.go) for all categories
-// All endpoints follow the pattern: /v3/workspaces/{workspace_id}/{category}/...
-requestURL := c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "peers")
-
-// ✅ If an endpoint doesn't start with /v3/workspaces, define a new constant
-const specialBaseURI = "/v3/special-endpoint"
-
-// ✅ Build category-specific paths by appending to workspaceBaseURI
-const (
-    workspaceBaseURI = "/v3/workspaces"  // defined once in workspace.go
-)
-
-// ❌ Avoid hardcoding full URLs
-requestURL, err := url.Parse("https://api.honcho.dev/v3/workspaces")
-
-// ❌ Don't define redundant base URI constants per category
-const (
-    peerBaseURI = "/v3/workspaces"  // wrong! reuse workspaceBaseURI
-)
-
-// ❌ Don't create new constants unnecessarily - only for truly different base paths
-const (
-    peerBaseURI = "/v3/workspaces/peers"  // wrong! this is just a path extension
-)
-```
-
----
-
 ## Low-Level Request Method
 
 ### Usage
@@ -730,37 +733,6 @@ if resp.Header.Get("Content-Type") == "application/xml" {
 
 ---
 
-## Constants & Imports
-
-### Pattern Definitions
-
-```go
-// ✅ Define regex patterns as package-level variables
-var workspaceIDPattern = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
-
-// ✅ Use constants for endpoint paths
-const (
-    workspaceBaseURI = "/v3/workspaces"
-)
-```
-
-### Clean Imports
-
-```go
-// ✅ Group standard library imports
-import (
-    "errors"
-    "fmt"
-    "net/http"
-    "regexp"
-    "time"
-)
-
-// ❌ Avoid unused imports
-```
-
----
-
 ## Implementation Verification
 
 **Before considering a category complete, verify all items in this checklist:**
@@ -831,69 +803,43 @@ grep "type.*struct" peer.go        # Should find nothing
 
 ---
 
-## Summary
+## Quick Reference
 
 ### DO:
 
 - ✅ Organize by category (`category.go`/`category_types.go`)
-- ✅ Reuse `workspaceBaseURI` constant from `workspace.go` (all endpoints start with `/v3/workspaces`)
-- ✅ Create a new base URI constant only for endpoints that don't start with `/v3/workspaces`
 - ✅ Separate types (`*_types.go`) from methods (`*.go`)
-- ✅ Verify type locations after implementation (session types in session_types.go, etc.)
-- ✅ Define types in their canonical category file (e.g., `Message` in `message_types.go`)
-- ✅ Reuse types from their canonical home when needed in other categories
+- ✅ Verify type locations after implementation
+- ✅ Define types in their canonical category file
+- ✅ Reuse `workspaceBaseURI` constant from `workspace.go`
 - ✅ Use named returns and naked returns
 - ✅ Validate mandatory parameters with `Validate()` methods
-- ✅ Copy validation constraints exactly from the OpenAPI spec (don't approximate)
+- ✅ Copy validation constraints exactly from the OpenAPI spec
 - ✅ Allow 0 for optional int fields where 0 means "use server default"
-- ✅ Use float literals (0.0, 1.0) for float64 validation
 - ✅ Use `any` instead of `interface{}`
 - ✅ Use pointers for optional nested structs
-- ✅ Use `baseURL.JoinPath()` for URL construction
 - ✅ Wrap errors with context using `%w`
-- ✅ Include descriptive block comments (1-3 sentences) AND API doc URLs in block comments
-- ✅ Agents should append `.md` when fetching documentation
+- ✅ Include descriptive block comments AND API doc URLs
 - ✅ Use the low-level `request()` method for all API calls
-- ✅ Extend `request()` when new body/result types are needed
-- ✅ Document struct field default values and constraints (including "0=use default" when applicable)
-- ✅ Implement ALL schemas from the API docs (request, response, errors)
-- ✅ Implement ALL HTTP status codes from the API docs
-- ✅ Give error types an `Error()` method and wrap with `%w`
-- ✅ Use `https://docs.honcho.dev/llms.txt` to discover all endpoints
-- ✅ Run the implementation verification checklist before considering work complete
-- ✅ Use `fmt.Errorf("item %d: %w", index, err)` for error messages in loops (not string concatenation)
-- ✅ Pass `bytes.Buffer` directly to `request()` for multipart forms (not `buffer.String()`)
-- ✅ Match method signature parameter order with existing patterns (req before options)
+- ✅ Document struct field default values and constraints
+- ✅ Implement ALL schemas and HTTP status codes from the API docs
+- ✅ Use `fmt.Errorf("item %d: %w", index, err)` for error messages in loops
+- ✅ Pass `bytes.Buffer` directly to `request()` for multipart forms
 - ✅ Omit `Validate()` method entirely if ALL fields are optional
-- ✅ Use the Method Implementation Checklist before finalizing methods
 
 ### DON'T:
 
-- ❌ Mix categories in the same file
-- ❌ Leave types in the wrong category file (even if related)
-- ❌ Duplicate types across category files (define once in canonical location)
-- ❌ Define redundant base URI constants (reuse `workspaceBaseURI` from `workspace.go`)
-- ❌ Omit descriptive block comments for methods (not just URLs)
-- ❌ Mix types and methods in the same file
+- ❌ Mix categories or leave types in the wrong category file
+- ❌ Define redundant base URI constants
+- ❌ Omit descriptive block comments for methods
 - ❌ Validate optional parameters (server handles those)
-- ❌ Approximate validation constraints (copy exact min/max from spec)
-- ❌ Reject 0 for optional int fields where 0 means "use server default"
-- ❌ Use int literals for float64 validation (use 0.0, 1.0)
+- ❌ Approximate validation constraints
 - ❌ Hardcode full URLs
 - ❌ Use `interface{}` (use `any`)
-- ❌ Use value types for optional nested structs
-- ❌ Use pointer types when 0/false should mean "use default"
-- ❌ Use value types when you need to distinguish nil from 0
 - ❌ Call `http.Client.Do()` directly in API methods
-- ❌ Duplicate request/response handling logic
 - ❌ Return explicit values on naked returns
-- ❌ Leave struct fields undocumented (especially optional params)
-- ❌ Leave "0=use default" semantics undocumented
+- ❌ Leave struct fields undocumented
 - ❌ Ignore error schemas or HTTP status codes from the API docs
-- ❌ Return error types without `Error()` method
-- ❌ Consider implementation complete without running the verification checklist
-- ❌ Use string concatenation or `string(rune())` for error messages in loops (use `fmt.Errorf` with `%w`)
-- ❌ Convert multipart `bytes.Buffer` to string with `buffer.String()` (pass buffer directly)
-- ❌ Invent new parameter orderings - check existing methods for consistency (req before options)
-- ❌ Add `Validate()` method when ALL fields are optional (omit it entirely)
-- ❌ Skip the Method Implementation Checklist
+- ❌ Use string concatenation for error messages in loops
+- ❌ Convert multipart `bytes.Buffer` to string with `buffer.String()`
+- ❌ Add `Validate()` method when ALL fields are optional
