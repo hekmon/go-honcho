@@ -6,6 +6,8 @@ Honcho is a memory layer for AI applications that enables persistent, contextual
 
 > **Note:** This is a community-maintained SDK and is not officially affiliated with Honcho.
 
+> **Agentic Engineering:** This SDK was developed using AI-assisted development following the guidelines in [AGENT.md](AGENT.md). The implementation adheres to consistent patterns and conventions established for AI agent collaboration.
+
 ## Features
 
 - **Type-safe API client** - Strongly-typed structs for all requests and responses
