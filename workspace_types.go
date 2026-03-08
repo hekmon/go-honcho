@@ -144,18 +144,6 @@ func (req MessageSearchOptions) Validate() error {
 	return nil
 }
 
-// Message represents a Honcho message
-type Message struct {
-	ID          string         `json:"id"`
-	Content     string         `json:"content"`
-	PeerID      string         `json:"peer_id"`
-	SessionID   string         `json:"session_id"`
-	Metadata    map[string]any `json:"metadata,omitempty"`
-	CreatedAt   time.Time      `json:"created_at"`
-	WorkspaceID string         `json:"workspace_id"`
-	TokenCount  int            `json:"token_count"`
-}
-
 // GetAllWorkspacesOptions represents optional parameters for GetAllWorkspaces
 type GetAllWorkspacesOptions struct {
 	Page int // Page is the page number (default: 1, minimum: 1)

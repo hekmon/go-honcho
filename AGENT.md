@@ -71,6 +71,8 @@ grep "type Peer" peer.go        # Should find nothing
 
 **❌ Don't leave types in the wrong category file even if they're related** - Sessions and Peers are related but their types belong in separate files.
 
+**Canonical type location:** When implementing a new category, define all types for that category in `{category}_types.go`, even if they were previously defined elsewhere. For example, when implementing the messages category, the `Message` struct should be defined in `message_types.go`, not in `workspace_types.go` where it might have been used before. Other categories should then reuse the type from its canonical home.
+
 ### Base URI Constant
 
 **All API endpoints share the same base URI `/v3/workspaces`. Use the `workspaceBaseURI` constant from `workspace.go` in all category files:**
@@ -567,6 +569,8 @@ grep "type.*struct" peer.go        # Should find nothing
 - ✅ Create a new base URI constant only for endpoints that don't start with `/v3/workspaces`
 - ✅ Separate types (`*_types.go`) from methods (`*.go`)
 - ✅ Verify type locations after implementation (session types in session_types.go, etc.)
+- ✅ Define types in their canonical category file (e.g., `Message` in `message_types.go`)
+- ✅ Reuse types from their canonical home when needed in other categories
 - ✅ Use named returns and naked returns
 - ✅ Validate mandatory parameters with `Validate()` methods
 - ✅ Copy validation constraints exactly from the OpenAPI spec (don't approximate)
@@ -589,6 +593,7 @@ grep "type.*struct" peer.go        # Should find nothing
 
 - ❌ Mix categories in the same file
 - ❌ Leave types in the wrong category file (even if related)
+- ❌ Duplicate types across category files (define once in canonical location)
 - ❌ Define redundant base URI constants (reuse `workspaceBaseURI` from `workspace.go`)
 - ❌ Omit documentation links for methods
 - ❌ Mix types and methods in the same file
