@@ -102,12 +102,22 @@ const (
 
 ### API References
 
-**Include Honcho docs URL in block comments (WITHOUT `.md` extension for IDE visibility):**
+**Include BOTH a descriptive block comment AND the Honcho docs URL (WITHOUT `.md` extension for IDE visibility):**
 
 ```go
-// https://docs.honcho.dev/v3/api-reference/endpoint/workspaces/get-or-create-workspace
-func (c *Client) GetOrCreateWorkspace(req CreateWorkspaceRequest) (result *Workspace, err error) {
+// CreateConclusions creates one or more Conclusions.
+//
+// Conclusions are logical certainties derived from interactions between Peers.
+// They form the basis of a Peer's Representation.
+//
+// https://docs.honcho.dev/v3/api-reference/endpoint/conclusions/create-conclusions
+func (c *Client) CreateConclusions(workspaceID string, req ConclusionBatchCreate) (result []*Conclusion, err error) {
 ```
+
+**Block Comment Guidelines:**
+- ✅ Include 1-3 sentences explaining what the endpoint does
+- ✅ Include the API doc URL (without `.md` extension)
+- ✅ Place the comment directly above the function signature
 
 **Note for Agents:** When fetching documentation, append `.md` to the URL:
 - Agent fetch: `https://docs.honcho.dev/v3/api-reference/endpoint/workspaces/get-or-create-workspace.md`
@@ -168,6 +178,20 @@ case http.StatusUnprocessableEntity:
 ---
 
 ## Implementation Pattern
+
+### Method Implementation Checklist
+
+Before finalizing a method, verify:
+
+- [ ] Block comment with 1-3 sentence description
+- [ ] API doc URL in block comment (without `.md` extension)
+- [ ] Named returns: `(result *Type, err error)`
+- [ ] Validation called if request has `Validate()` method
+- [ ] Uses `workspaceBaseURI` constant
+- [ ] Uses `c.request()` method
+- [ ] Errors wrapped with `%w`
+- [ ] Naked returns (no explicit return values)
+- [ ] Result initialized correctly (`new(Type)` or `make([]*Type, 0, capacity)`)
 
 ### Standard Method Structure
 
@@ -295,9 +319,79 @@ Configuration *WorkspaceConfiguration `json:"configuration,omitempty"`
 Configuration WorkspaceConfiguration `json:"configuration,omitempty"`
 ```
 
+### Pointer vs Value Type Decision Guide
+
+**Use pointer (`*int`, `*bool`, `*string`) when:**
+- You need to distinguish between "not provided" (nil) and "explicitly set to zero value"
+- The field is truly optional with no meaningful default
+
+```go
+// ✅ Pointer distinguishes nil vs 0
+type GetPeerContextOptions struct {
+    SearchTopK *int `json:"search_top_k,omitempty"`  // nil = not provided, 0 = explicitly zero
+}
+```
+
+**Use value type (`int`, `bool`) with `omitempty` when:**
+- Zero value (0, false) should mean "use server default"
+- No need to distinguish between nil and zero
+
+```go
+// ✅ Value type with omitempty: 0 means "use default"
+type ConclusionQuery struct {
+    TopK int `json:"top_k,omitempty"`  // 0 omitted from JSON, server uses default (10)
+}
+```
+
+```go
+// ❌ Don't use pointer when 0 should mean "use default"
+TopK *int `json:"top_k,omitempty"`  // forces caller to use &value instead of just value
+
+// ❌ Don't use value type when you need to distinguish nil from 0
+SearchTopK int `json:"search_top_k,omitempty"`  // can't tell if 0 means "not set" or "set to 0"
+```
+
 ---
 
 ## Validation
+
+### When to Add Validate() Methods
+
+Use this decision tree to determine if a struct needs a `Validate()` method:
+
+```
+Does the struct have ANY required fields (no omitempty)?
+├─ YES → Add Validate() method
+│  └─ Validate required fields and constraints
+│
+└─ NO → Does the struct have optional fields with constraints?
+   ├─ YES, and field is int/float with 0=default → Add Validate()
+   │  └─ Allow 0, validate non-zero values against constraints
+   │
+   └─ NO (all fields truly optional, no constraints) → NO Validate()
+      └─ Remove Validate() method entirely
+```
+
+**Examples:**
+
+```go
+// ✅ Has required field → needs Validate()
+type ConclusionCreate struct {
+    Content string `json:"content"`  // required
+}
+
+// ✅ Has optional field with constraints → needs Validate()
+type ConclusionQuery struct {
+    Query string `json:"query"`           // required
+    TopK  int    `json:"top_k,omitempty"` // optional, but constrained
+}
+
+// ❌ All fields optional, no constraints → NO Validate()
+type ConclusionGet struct {
+    Filters map[string]any `json:"filters,omitempty"`  // only field, optional
+}
+// No Validate() method - caller can pass empty struct
+```
 
 ### Validate() Methods
 
@@ -342,6 +436,46 @@ func (c *Client) GetOrCreateWorkspace(req CreateWorkspaceRequest) (result *Works
 ```
 
 ### Validation Constraint Precision
+
+**Copy exact constraints from the OpenAPI spec - do not approximate:**
+
+**For int fields with omitempty where 0 means "use default":**
+
+```go
+// ✅ Allow 0 (means "use server default"), validate non-zero values
+type ConclusionQuery struct {
+    // TopK is the number of results to return (0=use default: 10, min: 1, max: 100)
+    TopK int `json:"top_k,omitempty"`
+}
+
+func (req ConclusionQuery) Validate() error {
+    if req.Query == "" {
+        return errors.New("query is required")
+    }
+    // ✅ Allow 0, validate only if non-zero
+    if req.TopK != 0 && (req.TopK < 1 || req.TopK > 100) {
+        return errors.New("top_k must be between 1 and 100")
+    }
+    return nil
+}
+
+// ❌ Don't reject 0 when it means "use default"
+if req.TopK < 1 || req.TopK > 100 {  // rejects 0 incorrectly!
+    return errors.New("top_k must be between 1 and 100")
+}
+```
+
+**For float64 validation:**
+
+```go
+// ✅ Use float literals for float64 validation
+if req.Distance != nil && (*req.Distance < 0.0 || *req.Distance > 1.0) {
+    return errors.New("distance must be between 0 and 1")
+}
+
+// ❌ Avoid mixing int and float literals (confusing)
+if req.Distance != nil && (*req.Distance < 0 || *req.Distance > 1) {
+```
 
 **Copy exact constraints from the OpenAPI spec - do not approximate:**
 
@@ -400,6 +534,34 @@ type GetAllWorkspacesOptions struct {
     Page int
     Size int
 }
+```
+
+**Document zero-value defaults explicitly:**
+
+```go
+// ✅ Document when 0 means "use server default"
+type ConclusionQuery struct {
+    // TopK is the number of results to return (0=use default: 10, min: 1, max: 100)
+    TopK int `json:"top_k,omitempty"`
+    
+    // Distance is the maximum cosine distance threshold (optional, 0-1)
+    Distance *float64 `json:"distance,omitempty"`
+}
+
+// ✅ Document pointer defaults clearly
+type ListConclusionsOptions struct {
+    // Reverse is whether to reverse the order of results (default: false)
+    Reverse *bool  // nil = use server default (false)
+    
+    // Page is the page number (default: 1, minimum: 1)
+    Page int  // 0 = use server default (1)
+    
+    // Size is the page size (default: 50, minimum: 1, maximum: 100)
+    Size int  // 0 = use server default (50)
+}
+
+// ❌ Avoid ambiguous documentation
+// TopK is the number of results to return (min: 1, max: 100)  // doesn't mention 0!
 ```
 
 This is critical for optional parameters where `0` means "use server default".
@@ -683,15 +845,17 @@ grep "type.*struct" peer.go        # Should find nothing
 - ✅ Use named returns and naked returns
 - ✅ Validate mandatory parameters with `Validate()` methods
 - ✅ Copy validation constraints exactly from the OpenAPI spec (don't approximate)
+- ✅ Allow 0 for optional int fields where 0 means "use server default"
+- ✅ Use float literals (0.0, 1.0) for float64 validation
 - ✅ Use `any` instead of `interface{}`
 - ✅ Use pointers for optional nested structs
 - ✅ Use `baseURL.JoinPath()` for URL construction
 - ✅ Wrap errors with context using `%w`
-- ✅ Include API doc URLs in block comments (without `.md` - for IDE visibility)
+- ✅ Include descriptive block comments (1-3 sentences) AND API doc URLs in block comments
 - ✅ Agents should append `.md` when fetching documentation
 - ✅ Use the low-level `request()` method for all API calls
 - ✅ Extend `request()` when new body/result types are needed
-- ✅ Document struct field default values and constraints
+- ✅ Document struct field default values and constraints (including "0=use default" when applicable)
 - ✅ Implement ALL schemas from the API docs (request, response, errors)
 - ✅ Implement ALL HTTP status codes from the API docs
 - ✅ Give error types an `Error()` method and wrap with `%w`
@@ -700,7 +864,8 @@ grep "type.*struct" peer.go        # Should find nothing
 - ✅ Use `fmt.Errorf("item %d: %w", index, err)` for error messages in loops (not string concatenation)
 - ✅ Pass `bytes.Buffer` directly to `request()` for multipart forms (not `buffer.String()`)
 - ✅ Match method signature parameter order with existing patterns (req before options)
-- ✅ Omit `Validate()` method entirely if ALL struct fields are optional
+- ✅ Omit `Validate()` method entirely if ALL fields are optional
+- ✅ Use the Method Implementation Checklist before finalizing methods
 
 ### DON'T:
 
@@ -708,17 +873,22 @@ grep "type.*struct" peer.go        # Should find nothing
 - ❌ Leave types in the wrong category file (even if related)
 - ❌ Duplicate types across category files (define once in canonical location)
 - ❌ Define redundant base URI constants (reuse `workspaceBaseURI` from `workspace.go`)
-- ❌ Omit documentation links for methods
+- ❌ Omit descriptive block comments for methods (not just URLs)
 - ❌ Mix types and methods in the same file
 - ❌ Validate optional parameters (server handles those)
 - ❌ Approximate validation constraints (copy exact min/max from spec)
+- ❌ Reject 0 for optional int fields where 0 means "use server default"
+- ❌ Use int literals for float64 validation (use 0.0, 1.0)
 - ❌ Hardcode full URLs
 - ❌ Use `interface{}` (use `any`)
 - ❌ Use value types for optional nested structs
+- ❌ Use pointer types when 0/false should mean "use default"
+- ❌ Use value types when you need to distinguish nil from 0
 - ❌ Call `http.Client.Do()` directly in API methods
 - ❌ Duplicate request/response handling logic
 - ❌ Return explicit values on naked returns
 - ❌ Leave struct fields undocumented (especially optional params)
+- ❌ Leave "0=use default" semantics undocumented
 - ❌ Ignore error schemas or HTTP status codes from the API docs
 - ❌ Return error types without `Error()` method
 - ❌ Consider implementation complete without running the verification checklist
@@ -726,3 +896,4 @@ grep "type.*struct" peer.go        # Should find nothing
 - ❌ Convert multipart `bytes.Buffer` to string with `buffer.String()` (pass buffer directly)
 - ❌ Invent new parameter orderings - check existing methods for consistency (req before options)
 - ❌ Add `Validate()` method when ALL fields are optional (omit it entirely)
+- ❌ Skip the Method Implementation Checklist
