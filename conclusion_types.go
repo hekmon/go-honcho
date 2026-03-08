@@ -47,7 +47,7 @@ type ConclusionGet struct {
 type ConclusionQuery struct {
 	// Query is the semantic search query (required)
 	Query string `json:"query"`
-	// TopK is the number of results to return (default: 10, min: 1, max: 100)
+	// TopK is the number of results to return (0=use default: 10, min: 1, max: 100)
 	TopK int `json:"top_k,omitempty"`
 	// Distance is the maximum cosine distance threshold for results (optional, 0-1)
 	Distance *float64 `json:"distance,omitempty"`

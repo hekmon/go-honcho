@@ -7,6 +7,11 @@ import (
 	"strconv"
 )
 
+// CreateConclusions creates one or more Conclusions.
+//
+// Conclusions are logical certainties derived from interactions between Peers.
+// They form the basis of a Peer's Representation.
+//
 // https://docs.honcho.dev/v3/api-reference/endpoint/conclusions/create-conclusions
 func (c *Client) CreateConclusions(workspaceID string, req ConclusionBatchCreate) (result []*Conclusion, err error) {
 	if workspaceID == "" {
@@ -25,6 +30,10 @@ func (c *Client) CreateConclusions(workspaceID string, req ConclusionBatchCreate
 	return
 }
 
+// DeleteConclusion deletes a single Conclusion by ID.
+//
+// This action cannot be undone.
+//
 // https://docs.honcho.dev/v3/api-reference/endpoint/conclusions/delete-conclusion
 func (c *Client) DeleteConclusion(workspaceID, conclusionID string) (err error) {
 	if workspaceID == "" {
@@ -43,6 +52,10 @@ func (c *Client) DeleteConclusion(workspaceID, conclusionID string) (err error) 
 	return
 }
 
+// ListConclusions lists Conclusions using optional filters, ordered by recency unless `reverse` is true.
+//
+// Results are paginated.
+//
 // https://docs.honcho.dev/v3/api-reference/endpoint/conclusions/list-conclusions
 func (c *Client) ListConclusions(workspaceID string, req *ConclusionGet, opts *ListConclusionsOptions) (result *PageConclusion, err error) {
 	if workspaceID == "" {
@@ -71,6 +84,10 @@ func (c *Client) ListConclusions(workspaceID string, req *ConclusionGet, opts *L
 	return
 }
 
+// QueryConclusions queries Conclusions using semantic search.
+//
+// Use `top_k` to control the number of results returned.
+//
 // https://docs.honcho.dev/v3/api-reference/endpoint/conclusions/query-conclusions
 func (c *Client) QueryConclusions(workspaceID string, req ConclusionQuery) (result []*Conclusion, err error) {
 	if workspaceID == "" {
@@ -127,10 +144,10 @@ func (req ConclusionQuery) Validate() error {
 	if req.Query == "" {
 		return errors.New("query is required")
 	}
-	if req.TopK < 1 || req.TopK > 100 {
+	if req.TopK != 0 && (req.TopK < 1 || req.TopK > 100) {
 		return errors.New("top_k must be between 1 and 100")
 	}
-	if req.Distance != nil && (*req.Distance < 0 || *req.Distance > 1) {
+	if req.Distance != nil && (*req.Distance < 0.0 || *req.Distance > 1.0) {
 		return errors.New("distance must be between 0 and 1")
 	}
 	return nil
