@@ -122,7 +122,7 @@ The SDK is organized by API categories. Each category has its own methods and ty
 | **Webhook** | Configure webhook endpoints | `webhook.go`, `webhook_types.go` |
 | **Key** | Manage API keys | `key.go`, `key_types.go` |
 
-## Workspace Operations
+### Workspace Operations
 
 ```go
 // Get or create a workspace
@@ -166,7 +166,7 @@ err = client.ScheduleDream("my-workspace", honcho.ScheduleDreamRequest{
 })
 ```
 
-## Peer Operations
+### Peer Operations
 
 ```go
 // Create or get a peer
@@ -226,7 +226,7 @@ response, err := client.Chat("workspace-id", "user-123", honcho.DialecticOptions
 })
 ```
 
-## Session Operations
+### Session Operations
 
 ```go
 // Create or get a session
@@ -318,7 +318,7 @@ err = client.SetPeerConfig("workspace-id", "session-id", "user-123", honcho.Sess
 summaries, err := client.GetSessionSummaries("workspace-id", "session-id")
 ```
 
-## Message Operations
+### Message Operations
 
 ```go
 // Create messages for a session
@@ -372,7 +372,7 @@ message, err = client.UpdateMessage("workspace-id", "session-id", "message-id", 
 })
 ```
 
-## Conclusion Operations
+### Conclusion Operations
 
 ```go
 // Create conclusions
@@ -411,7 +411,7 @@ conclusions, err = client.QueryConclusions("workspace-id", honcho.ConclusionQuer
 err = client.DeleteConclusion("workspace-id", "conclusion-id")
 ```
 
-## Webhook Operations
+### Webhook Operations
 
 ```go
 // Get or create a webhook endpoint
@@ -432,7 +432,7 @@ err = client.DeleteWebhookEndpoint("workspace-id", "endpoint-id")
 err = client.TestEmit("workspace-id")
 ```
 
-## API Key Operations
+### API Key Operations
 
 ```go
 // Create an API key scoped to a workspace
