@@ -6,6 +6,30 @@ import (
 	"time"
 )
 
+// CreateWorkspaceRequest represents the request body for creating/getting a workspace
+type CreateWorkspaceRequest struct {
+	ID            string                  `json:"id"`
+	Metadata      map[string]any          `json:"metadata,omitempty"`
+	Configuration *WorkspaceConfiguration `json:"configuration,omitempty"`
+}
+
+// workspaceIDPattern validates workspace ID format
+var workspaceIDPattern = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
+
+// Validate checks that mandatory fields are valid
+func (req CreateWorkspaceRequest) Validate() error {
+	if req.ID == "" {
+		return errors.New("id is required")
+	}
+	if len(req.ID) > 100 {
+		return errors.New("id must be 100 characters or less")
+	}
+	if !workspaceIDPattern.MatchString(req.ID) {
+		return errors.New("id must contain only letters, numbers, underscores, or hyphens")
+	}
+	return nil
+}
+
 // Workspace represents a Honcho workspace
 type Workspace struct {
 	ID            string                  `json:"id"`
@@ -46,26 +70,22 @@ type DreamConfig struct {
 	Enabled bool `json:"enabled,omitempty"`
 }
 
-// CreateWorkspaceRequest represents the request body for creating/getting a workspace
-type CreateWorkspaceRequest struct {
-	ID            string                  `json:"id"`
-	Metadata      map[string]any          `json:"metadata,omitempty"`
-	Configuration *WorkspaceConfiguration `json:"configuration,omitempty"`
+// WorkspaceGetRequest represents the request body for getting all workspaces
+type WorkspaceGetRequest struct {
+	Filters map[string]any `json:"filters,omitempty"`
 }
 
-// workspaceIDPattern validates workspace ID format
-var workspaceIDPattern = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
+// GetAllWorkspacesOptions represents optional parameters for GetAllWorkspaces
+type GetAllWorkspacesOptions struct {
+	Page int // Page is the page number (default: 1, minimum: 1)
+	Size int // Size is the page size (default: 50, minimum: 1, maximum: 100)
+}
 
-// Validate checks that mandatory fields are valid
-func (req CreateWorkspaceRequest) Validate() error {
-	if req.ID == "" {
-		return errors.New("id is required")
-	}
-	if len(req.ID) > 100 {
-		return errors.New("id must be 100 characters or less")
-	}
-	if !workspaceIDPattern.MatchString(req.ID) {
-		return errors.New("id must contain only letters, numbers, underscores, or hyphens")
-	}
-	return nil
+// PageWorkspace represents a paginated response of workspaces
+type PageWorkspace struct {
+	Items []Workspace `json:"items"`
+	Total int         `json:"total"`
+	Page  int         `json:"page"`
+	Size  int         `json:"size"`
+	Pages int         `json:"pages"`
 }

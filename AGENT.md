@@ -72,6 +72,29 @@ Configuration *WorkspaceConfiguration `json:"configuration,omitempty"`
 Configuration WorkspaceConfiguration `json:"configuration,omitempty"`
 ```
 
+## Struct Field Documentation
+
+### Default Values and Constraints
+When defining struct fields, especially for optional parameters, document default values and constraints:
+
+```go
+// ✅ Document defaults and constraints
+type GetAllWorkspacesOptions struct {
+    // Page is the page number (default: 1, minimum: 1)
+    Page int
+    // Size is the page size (default: 50, minimum: 1, maximum: 100)
+    Size int
+}
+
+// ❌ Avoid undocumented fields
+type GetAllWorkspacesOptions struct {
+    Page int
+    Size int
+}
+```
+
+This is critical for optional parameters where `0` means "use server default".
+
 ## URL Construction
 
 ### Endpoint Paths
@@ -261,6 +284,7 @@ import (
 - ✅ Include `.md` API doc URLs in block comments
 - ✅ Use the low-level `request()` method for all API calls
 - ✅ Extend `request()` when new body/result types are needed
+- ✅ Document struct field default values and constraints
 
 **DON'T:**
 - ❌ Mix categories in the same file
@@ -274,3 +298,4 @@ import (
 - ❌ Call `http.Client.Do()` directly in API methods
 - ❌ Duplicate request/response handling logic
 - ❌ Return explicit values on naked returns
+- ❌ Leave struct fields undocumented (especially optional params)
