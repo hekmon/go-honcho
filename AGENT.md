@@ -1,18 +1,267 @@
 # Honcho Go SDK - Agent Guidelines
 
-This document provides comprehensive guidelines for implementing the Honcho Go SDK. Follow these rules to ensure consistency, completeness, and maintainability.
+This document provides comprehensive guidelines for implementing the Honcho Go SDK. Follow these rules to ensure consistency, completeness, and maintainability across the codebase.
 
 ## Table of Contents
 
-1. [File Organization](#file-organization)
-2. [Constants & Shared Resources](#constants--shared-resources)
-3. [Documentation & API Discovery](#documentation--api-discovery)
-4. [Implementation Pattern](#implementation-pattern)
-5. [Coding Style](#coding-style)
-6. [Validation](#validation)
-7. [Low-Level Request Method](#low-level-request-method)
-8. [Implementation Verification](#implementation-verification)
-9. [Quick Reference](#quick-reference)
+1. [Introduction](#introduction)
+2. [File Organization](#file-organization)
+3. [Constants & Shared Resources](#constants--shared-resources)
+4. [Documentation & API Discovery](#documentation--api-discovery)
+5. [Implementation Pattern](#implementation-pattern)
+6. [Coding Style](#coding-style)
+7. [Validation](#validation)
+8. [Low-Level Request Method](#low-level-request-method)
+9. [Implementation Verification](#implementation-verification)
+10. [Quick Reference](#quick-reference)
+
+---
+
+## Introduction
+
+### Purpose
+
+This SDK provides a Go client for the Honcho API v3. All implementations must follow the patterns and conventions documented here to ensure consistency, type safety, and maintainability.
+
+### Core Principles
+
+- **Type Safety**: All API requests and responses use strongly-typed structs
+- **Error Handling**: All errors are wrapped with context and support error chaining via `%w`; error types implement `Error()` method
+- **Validation**: Client-side validation for required fields and constraints; server handles optional field validation
+- **Documentation**: Every method includes block comments with API descriptions and doc URLs
+- **Consistency**: Uniform patterns across all category implementations
+
+### Project Structure
+
+```
+go-honcho/
+├── client.go              # HTTP client setup
+├── request.go             # Low-level request method and shared error types
+├── {category}.go          # Method implementations (e.g., workspace.go)
+└── {category}_types.go    # Type definitions (e.g., workspace_types.go)
+```
+
+---
+
+## Client Initialization
+
+### Basic Setup
+
+**Initialize the client with your API key and base URL:**
+
+```go
+import "github.com/hekmon/go-honcho"
+
+// ✅ Basic initialization
+client, err := honcho.NewClient("your-api-key", "https://api.honcho.dev")
+if err != nil {
+    // handle error
+}
+
+// ✅ Use environment variable for API key (recommended)
+apiKey := os.Getenv("HONCHO_API_KEY")
+client, err := honcho.NewClient(apiKey, "https://api.honcho.dev")
+```
+
+### Client Configuration
+
+**The `NewClient` function signature:**
+
+```go
+func NewClient(apiKey, baseURL string) (*Client, error)
+```
+
+**Parameters:**
+- `apiKey`: Your Honcho API key (required, can be empty string for public endpoints)
+- `baseURL`: The base URL for the API (e.g., "https://api.honcho.dev")
+
+**Returns:**
+- `*Client`: Configured client instance
+- `error`: Error if URL parsing fails
+
+### Custom HTTP Client
+
+**To customize HTTP settings (timeouts, transport, etc.):**
+
+```go
+// ✅ Custom HTTP client with timeouts
+httpClient := &http.Client{
+    Timeout: 30 * time.Second,
+    Transport: &http.Transport{
+        MaxIdleConns:        100,
+        MaxIdleConnsPerHost: 10,
+        IdleConnTimeout:     90 * time.Second,
+    },
+}
+
+client, err := honcho.NewClientWithHTTP(apiKey, baseURL, httpClient)
+```
+
+**Common HTTP client configurations:**
+
+```go
+// ✅ Longer timeout for file uploads
+httpClient := &http.Client{
+    Timeout: 5 * time.Minute,
+}
+
+// ✅ Custom transport with proxy
+transport := &http.Transport{
+    Proxy: http.ProxyFromEnvironment,
+}
+httpClient := &http.Client{
+    Transport: transport,
+    Timeout:   30 * time.Second,
+}
+
+// ✅ Disable timeout for streaming operations
+httpClient := &http.Client{
+    Timeout: 0, // no timeout
+}
+```
+
+### Client Usage Patterns
+
+**Thread Safety:**
+
+```go
+// ✅ Client is safe for concurrent use - create once, reuse everywhere
+var client *honcho.Client
+
+func init() {
+    client, _ = honcho.NewClient(apiKey, baseURL)
+}
+
+// Use the same client instance across goroutines
+go func() {
+    workspace, _ := client.GetOrCreateWorkspace(req)
+}()
+```
+
+**Multiple Clients:**
+
+```go
+// ✅ Create separate clients for different workspaces/environments
+prodClient, _ := honcho.NewClient(prodAPIKey, "https://api.honcho.dev")
+devClient, _ := honcho.NewClient(devAPIKey, "https://dev.honcho.dev")
+```
+
+### Environment Variables
+
+**Use environment variables for configuration:**
+
+```go
+// ✅ Recommended environment variables
+HONCHO_API_KEY      // Your Honcho API key (required)
+HONCHO_BASE_URL     // API base URL (optional, defaults to https://api.honcho.dev)
+HONCHO_TIMEOUT      // HTTP timeout in seconds (optional, defaults to 30)
+```
+
+**Loading configuration from environment:**
+
+```go
+// ✅ Load configuration from environment variables
+apiKey := os.Getenv("HONCHO_API_KEY")
+if apiKey == "" {
+    log.Fatal("HONCHO_API_KEY environment variable is required")
+}
+
+baseURL := os.Getenv("HONCHO_BASE_URL")
+if baseURL == "" {
+    baseURL = "https://api.honcho.dev"
+}
+
+timeoutStr := os.Getenv("HONCHO_TIMEOUT")
+timeout := 30 * time.Second
+if timeoutStr != "" {
+    if seconds, err := strconv.Atoi(timeoutStr); err == nil {
+        timeout = time.Duration(seconds) * time.Second
+    }
+}
+
+httpClient := &http.Client{Timeout: timeout}
+client, err := honcho.NewClientWithHTTP(apiKey, baseURL, httpClient)
+```
+
+**Configuration file example (.env):**
+
+```bash
+# ✅ .env file for local development
+HONCHO_API_KEY=your-api-key-here
+HONCHO_BASE_URL=https://api.honcho.dev
+HONCHO_TIMEOUT=30
+```
+
+### Configuration Management
+
+**For applications with complex configuration needs:**
+
+```go
+// ✅ Configuration struct for managing settings
+type Config struct {
+    APIKey   string
+    BaseURL  string
+    Timeout  time.Duration
+    LogLevel string
+}
+
+// LoadFromEnv loads configuration from environment variables
+func LoadFromEnv() (*Config, error) {
+    cfg := &Config{
+        APIKey:   os.Getenv("HONCHO_API_KEY"),
+        BaseURL:  os.Getenv("HONCHO_BASE_URL"),
+        LogLevel: os.Getenv("HONCHO_LOG_LEVEL"),
+    }
+    
+    if cfg.APIKey == "" {
+        return nil, errors.New("HONCHO_API_KEY is required")
+    }
+    
+    if cfg.BaseURL == "" {
+        cfg.BaseURL = "https://api.honcho.dev"
+    }
+    
+    timeoutStr := os.Getenv("HONCHO_TIMEOUT")
+    cfg.Timeout = 30 * time.Second
+    if timeoutStr != "" {
+        if seconds, err := strconv.Atoi(timeoutStr); err == nil {
+            cfg.Timeout = time.Duration(seconds) * time.Second
+        }
+    }
+    
+    return cfg, nil
+}
+
+// NewClientFromConfig creates a client from configuration
+func NewClientFromConfig(cfg *Config) (*honcho.Client, error) {
+    httpClient := &http.Client{Timeout: cfg.Timeout}
+    return honcho.NewClientWithHTTP(cfg.APIKey, cfg.BaseURL, httpClient)
+}
+```
+
+### Best Practices
+
+**Client Initialization:**
+- ✅ Initialize client once at application startup
+- ✅ Store API key in environment variable (`HONCHO_API_KEY`)
+- ✅ Reuse client instance across your application (it's thread-safe)
+- ✅ Set appropriate timeouts based on operation type
+- ❌ Don't create new client for each API call
+- ❌ Don't share client instances between different API keys
+
+**Environment Variables:**
+- ✅ Use `.env` files for local development (add to `.gitignore`)
+- ✅ Use secrets management in production (e.g., AWS Secrets Manager, HashiCorp Vault)
+- ✅ Provide sensible defaults for optional configuration
+- ✅ Validate required environment variables at startup
+- ❌ Don't hardcode API keys in source code
+- ❌ Don't commit `.env` files to version control
+
+**Error Handling:**
+- ✅ Check error from `NewClient()` during initialization
+- ✅ Log client initialization failures at startup
+- ✅ Use meaningful error messages for debugging
+- ✅ Fail fast on missing required configuration
 
 ---
 
@@ -22,8 +271,8 @@ This document provides comprehensive guidelines for implementing the Honcho Go S
 
 Each API category gets its own pair of files:
 
-- `{category}.go` - Method implementations
-- `{category}_types.go` - Type definitions
+- `{category}.go` - Method implementations only
+- `{category}_types.go` - Type definitions only
 
 **Example:** `workspace.go` / `workspace_types.go`, `peer.go` / `peer_types.go`
 
@@ -284,7 +533,7 @@ Before finalizing a method, verify:
 - [ ] Named returns: `(result *Type, err error)`
 - [ ] Validation called ONLY if `Validate()` method exists on the request type
 - [ ] If ALL fields are optional (no `Validate()` method), do NOT call `req.Validate()`
-- [ ] Uses `workspaceBaseURI` constant
+- [ ] Uses `workspaceBaseURI` constant (or appropriate `*BaseURI`)
 - [ ] Uses `c.request()` method
 - [ ] Errors wrapped with `%w`
 - [ ] Naked returns (no explicit return values)
@@ -333,6 +582,199 @@ func (c *Client) GetSessions(workspaceID string, opts *GetSessionsOptions, req *
 ```
 
 **Pattern:** Request body parameters come BEFORE optional query parameter structs. This matches the API structure (body is primary, query params are modifiers).
+
+### Path Parameters
+
+**When the URL contains path parameters (e.g., `{workspace_id}`, `{session_id}`):**
+
+```go
+// ✅ Pass path parameters as separate string arguments
+func (c *Client) DeleteWorkspace(workspaceID string) (err error) {
+    if workspaceID == "" {
+        err = errors.New("workspaceID is required")
+        return
+    }
+    requestURL := c.baseURL.JoinPath(workspaceBaseURI, workspaceID)
+    // ...
+}
+
+// ✅ Multiple path parameters
+func (c *Client) CreateMessagesWithFile(workspaceID, sessionID string, req MessageUpload) (result []*Message, err error) {
+    requestURL := c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "sessions", sessionID, "messages", "upload")
+    // ...
+}
+
+// ❌ Don't concatenate path strings manually
+requestURL := c.baseURL.JoinPath(workspaceBaseURI + "/" + workspaceID)  // WRONG!
+```
+
+### HTTP Methods
+
+**Use the correct HTTP method for each operation:**
+
+| Method | Use Case | Example |
+|--------|----------|---------|
+| `GET` | Retrieve resources | GetPeer, GetSession |
+| `POST` | Create resources or complex queries | GetOrCreateWorkspace, CreateMessages |
+| `PUT` | Full resource updates | UpdateWorkspace |
+| `DELETE` | Remove resources | DeleteWorkspace, DeletePeer |
+
+```go
+// ✅ Use appropriate HTTP method
+http.MethodGet    // for retrieval
+http.MethodPost   // for creation or search operations
+http.MethodPut    // for updates
+http.MethodDelete // for deletion
+
+// ❌ Don't use wrong methods
+http.MethodPost   // for simple retrieval (use GET)
+http.MethodGet    // for operations with request body (use POST)
+```
+
+**Note:** Some retrieval operations use POST when they require a request body (e.g., search with filters). Follow the OpenAPI spec.
+
+### Query Parameters
+
+**For GET requests with query parameters:**
+
+```go
+// ✅ Build query parameters using url.Values
+func (c *Client) GetSessions(workspaceID string, opts *GetSessionsOptions) (result *PageSession, err error) {
+    requestURL := c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "sessions")
+    
+    // Add query parameters
+    if opts != nil {
+        query := requestURL.Query()
+        if opts.Page > 0 {
+            query.Set("page", strconv.Itoa(opts.Page))
+        }
+        if opts.Size > 0 {
+            query.Set("size", strconv.Itoa(opts.Size))
+        }
+        if opts.Reverse != nil {
+            query.Set("reverse", strconv.FormatBool(*opts.Reverse))
+        }
+        requestURL.RawQuery = query.Encode()
+    }
+    
+    result = new(PageSession)
+    if _, err = c.request(http.MethodGet, requestURL, nil, nil, &result); err != nil {
+        err = fmt.Errorf("failed to get sessions: %w", err)
+        return
+    }
+    return
+}
+```
+
+**For POST requests with query parameters:**
+
+```go
+// ✅ Combine query parameters with request body
+func (c *Client) SearchMessages(workspaceID string, req MessageSearchOptions, opts *SearchOptions) (result *MessageSearchResult, err error) {
+    if err = req.Validate(); err != nil {
+        return
+    }
+    
+    requestURL := c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "messages", "search")
+    
+    // Add query parameters (if any)
+    if opts != nil {
+        query := requestURL.Query()
+        if opts.Limit > 0 {
+            query.Set("limit", strconv.Itoa(opts.Limit))
+        }
+        requestURL.RawQuery = query.Encode()
+    }
+    
+    result = new(MessageSearchResult)
+    if _, err = c.request(http.MethodPost, requestURL, nil, req, &result); err != nil {
+        err = fmt.Errorf("failed to search messages: %w", err)
+        return
+    }
+    return
+}
+```
+
+**Query Parameter Guidelines:**
+- ✅ Use `requestURL.Query()` to build query strings
+- ✅ Only add parameters with non-zero/non-nil values (unless zero is meaningful)
+- ✅ Encode query string with `requestURL.RawQuery = query.Encode()`
+- ✅ Document default values and constraints in the options struct
+- ❌ Don't manually concatenate query strings (`?page=1&size=10`)
+
+### Response Handling
+
+**All API responses are handled by the `request()` method:**
+
+```go
+// ✅ Standard JSON response - result is populated automatically
+result = new(Peer)
+if _, err = c.request(http.MethodGet, requestURL, nil, nil, &result); err != nil {
+    return
+}
+// result is now populated with JSON-decoded data
+
+// ✅ Array response - use slice pointer
+result = make([]*Message, 0)
+if _, err = c.request(http.MethodPost, requestURL, nil, req, &result); err != nil {
+    return
+}
+
+// ✅ No response body (204 No Content, 202 Accepted)
+if _, err = c.request(http.MethodDelete, requestURL, nil, nil, nil); err != nil {
+    return
+}
+// No result to decode
+
+// ✅ Raw response body (e.g., for file downloads)
+result = new(bytes.Buffer)
+if _, err = c.request(http.MethodGet, requestURL, nil, nil, &result); err != nil {
+    return
+}
+// result contains raw bytes
+```
+
+**Response Type Guidelines:**
+- ✅ Use `new(Type)` for single object responses
+- ✅ Use `make([]*Type, 0, capacity)` for array responses (ensures JSON encodes as `[]` not `null`)
+- ✅ Use `nil` for no response body (DELETE, some POST operations)
+- ✅ Use `*bytes.Buffer` for raw binary responses
+- ❌ Don't manually decode JSON responses (request() handles this)
+- ❌ Don't pass value types as result (always use pointers)
+
+### Pagination
+
+**Paginated responses follow a consistent pattern:**
+
+```go
+// ✅ Paginated response structure
+type PageSession struct {
+    Sessions   []Session `json:"sessions"`
+    Page       int       `json:"page"`
+    Size       int       `json:"size"`
+    TotalCount int       `json:"total_count"`
+    TotalPages int       `json:"total_pages"`
+}
+
+// ✅ Pagination in options struct
+type GetSessionsOptions struct {
+    // Page is the page number (default: 1, minimum: 1)
+    Page int
+    // Size is the page size (default: 50, minimum: 1, maximum: 100)
+    Size int
+    // Reverse is whether to reverse the order of results (default: false)
+    Reverse *bool  // nil = use server default
+}
+```
+
+**Pagination Guidelines:**
+- ✅ Use `Page*` prefix for paginated response types (e.g., `PageSession`, `PagePeer`)
+- ✅ Include pagination metadata in response (page, size, total_count, total_pages)
+- ✅ Document default values and constraints for pagination parameters
+- ✅ Use value types for Page/Size with `omitempty` (0 = use server default)
+- ✅ Use pointer types for boolean flags (nil = use server default)
+- ❌ Don't omit pagination metadata from response types
+- ❌ Don't use pointer types for Page/Size unless you need to distinguish nil from 0
 
 ---
 
@@ -388,6 +830,8 @@ return errors.New("message " + string(rune(i+1)) + ": " + err.Error())  // break
 
 ### Error Types
 
+**All custom error types must implement the `Error()` method:**
+
 ```go
 // ✅ Error types must implement Error() method and be wrapped with %w
 type HTTPValidationError struct {
@@ -405,18 +849,164 @@ err = fmt.Errorf("validation error: %w", &valErr)
 // ❌ Don't forget to wrap with %w for errors.As() support
 ```
 
+**Error Type Guidelines:**
+
+1. **Implement `Error()` method**: All custom error types must satisfy the `error` interface
+2. **Wrap with `%w`**: Always wrap error types with `%w` to preserve the error chain for `errors.As()` and `errors.Is()`
+3. **Use pointer receivers**: Define `Error()` on pointer receivers for consistency
+4. **Provide context**: Wrap error types with descriptive context messages
+
+**Example error type implementation:**
+
+```go
+// ✅ Complete error type with Error() method
+type NotFoundError struct {
+    ResourceType string
+    ResourceID   string
+}
+
+func (e *NotFoundError) Error() string {
+    return fmt.Sprintf("%s not found: %s", e.ResourceType, e.ResourceID)
+}
+
+// Usage in method:
+err = fmt.Errorf("failed to get resource: %w", &NotFoundError{ResourceType: "peer", ResourceID: peerID})
+```
+
+**Checking for specific error types:**
+
+```go
+// ✅ Check for specific error types using errors.As()
+var valErr *HTTPValidationError
+if errors.As(err, &valErr) {
+    // Handle validation error specifically
+    for _, detail := range valErr.Detail {
+        // Process each validation error
+    }
+}
+
+// ❌ Don't use type assertions without checking
+if valErr, ok := err.(*HTTPValidationError); ok {  // breaks with wrapped errors!
+```
+
 ### Type Declarations
 
 ```go
 // ✅ Use 'any' instead of 'interface{}'
 Metadata map[string]any `json:"metadata,omitempty"`
 
-// ✅ Use pointers for nested structs that can be omitempty
+// ✅ Use pointers for optional nested structs that can be omitempty
 Configuration *WorkspaceConfiguration `json:"configuration,omitempty"`
 
 // ❌ Avoid value types for optional nested structs
 Configuration WorkspaceConfiguration `json:"configuration,omitempty"`
 ```
+
+### Generics and Advanced Type Patterns
+
+**This SDK avoids generics for API types. Use concrete types for clarity and IDE support:**
+
+```go
+// ✅ Use concrete types for API requests and responses
+func (c *Client) GetPeer(workspaceID, peerID string) (result *Peer, err error)
+
+// ❌ Avoid generics for API types - reduces IDE autocomplete and clarity
+func (c *Client) GetResource[T any](workspaceID, resourceType, resourceID string) (result *T, err error)
+```
+
+**When to use `any`:**
+- ✅ Map values: `map[string]any` for flexible metadata
+- ✅ Slice elements: `[]any` for heterogeneous lists
+- ❌ NOT for request/response types - use concrete structs
+
+**Pointer semantics for optional fields:**
+
+```go
+// ✅ Pointer to distinguish nil vs zero value
+type GetPeerContextOptions struct {
+    SearchTopK *int     `json:"search_top_k,omitempty"`  // nil = not provided, 0 = explicitly zero
+    Filters    *string  `json:"filters,omitempty"`       // nil = not provided, "" = empty string
+}
+
+// ✅ Value type when 0 means "use server default"
+type ConclusionQuery struct {
+    TopK int `json:"top_k,omitempty"`  // 0 = use server default (10)
+}
+
+// ❌ Don't use pointer when value type suffices
+TopK *int `json:"top_k,omitempty"`  // forces caller to use &value
+```
+
+**Slice initialization:**
+
+```go
+// ✅ Initialize slices that will be populated
+result = make([]*Message, 0, len(req.Messages))
+
+// ✅ Initialize empty slices for JSON responses
+result = new(PageSession)  // PageSession.Sessions will be []Session or nil
+
+// ❌ Don't leave slices as nil if they should be empty arrays in JSON
+result = &PageSession{Sessions: nil}  // encodes as null, not []
+```
+
+### Time.Time Handling
+
+**The Honcho API uses RFC 3339 timestamps. Go's `time.Time` handles this automatically with JSON:**
+
+```go
+// ✅ time.Time fields work automatically with JSON encoding/decoding
+type Workspace struct {
+    ID        string    `json:"id"`
+    CreatedAt time.Time `json:"created_at"`  // RFC 3339 format
+}
+
+// ✅ time.Time pointers for optional timestamps
+type Session struct {
+    EndedAt *time.Time `json:"ended_at,omitempty"`  // nil = not ended
+}
+```
+
+**Time Handling Guidelines:**
+- ✅ Use `time.Time` for timestamp fields (automatically handles RFC 3339)
+- ✅ Use `*time.Time` for optional timestamps (nil = not set)
+- ✅ Use `omitempty` with pointer timestamps to omit nil values
+- ❌ Don't use string types for timestamps (lose type safety)
+- ❌ Don't manually parse/format RFC 3339 timestamps (time.Time does this)
+
+### JSON Tag Conventions
+
+**All struct fields must have proper JSON tags:**
+
+```go
+// ✅ Use snake_case for JSON tags (API convention)
+type CreateWorkspaceRequest struct {
+    WorkspaceID   string         `json:"workspace_id"`
+    CreatedAt     time.Time      `json:"created_at"`
+    Metadata      map[string]any `json:"metadata,omitempty"`
+    Configuration *WorkspaceConfig `json:"configuration,omitempty"`
+}
+
+// ✅ Use omitempty for optional fields
+type UpdateRequest struct {
+    Metadata map[string]any `json:"metadata,omitempty"`  // optional
+}
+
+// ✅ Required fields omit omitempty
+type CreateRequest struct {
+    ID      string `json:"id"`      // required
+    Content string `json:"content"` // required
+}
+```
+
+**JSON Tag Guidelines:**
+- ✅ Use snake_case for all JSON tags (matches API convention)
+- ✅ Add `omitempty` for optional fields (prevents sending zero values)
+- ✅ Omit `omitempty` for required fields (ensures they're always sent)
+- ✅ Use pointers for optional nested structs (with `omitempty`)
+- ❌ Don't use camelCase in JSON tags (API uses snake_case)
+- ❌ Don't omit JSON tags (explicit is better than implicit)
+- ❌ Don't use `omitempty` on required fields
 
 ---
 
@@ -436,8 +1026,10 @@ Does the struct have ANY required fields (no omitempty)?
    │  └─ Allow 0, validate non-zero values against constraints
    │
    └─ NO (all fields truly optional, no constraints) → NO Validate()
-      └─ Remove Validate() method entirely
+      └─ Do not add Validate() method - caller can pass empty struct
 ```
+
+**Key Principle:** Validate only what the client can verify before making the API call. Let the server handle optional field validation.
 
 **Examples:**
 
@@ -462,10 +1054,10 @@ type ConclusionGet struct {
 
 ### Validate() Methods
 
-**Add `Validate()` for mandatory parameters only:**
+**Add `Validate()` for mandatory parameters and constrained optional parameters:**
 
 ```go
-// ✅ Add Validate() for mandatory parameters only
+// ✅ Validate required fields with clear error messages
 func (req CreateWorkspaceRequest) Validate() error {
     if req.ID == "" {
         return errors.New("id is required")
@@ -479,16 +1071,31 @@ func (req CreateWorkspaceRequest) Validate() error {
     return nil
 }
 
+// ✅ Validate constrained optional fields (allow 0 = use default)
+func (req ConclusionQuery) Validate() error {
+    if req.Query == "" {
+        return errors.New("query is required")
+    }
+    // Allow 0 (means "use server default"), validate non-zero values
+    if req.TopK != 0 && (req.TopK < 1 || req.TopK > 100) {
+        return errors.New("top_k must be between 1 and 100")
+    }
+    return nil
+}
+
 // ❌ Don't validate optional parameters (let server handle those)
 
-// ❌ Don't add Validate() if ALL fields are optional - remove the method entirely
+// ❌ Don't add Validate() if ALL fields are optional - omit the method entirely
 type MessageUpdate struct {
     Metadata map[string]any `json:"metadata,omitempty"`  // only field, and it's optional
 }
-// No Validate() method needed - caller can pass empty struct
+// No Validate() method needed - caller can pass empty struct{}
 ```
 
-**Rule:** If a request type has ONLY optional fields (all fields have `omitempty`), do NOT add a `Validate()` method. The method should be omitted entirely, not return `nil`.
+**Rules:**
+1. If a request type has ONLY optional fields (all fields have `omitempty`), do NOT add a `Validate()` method
+2. The method should be omitted entirely, not return `nil`
+3. For optional int/float fields where 0 means "use server default", allow 0 and validate only non-zero values
 
 ### Call Validation in Methods
 
@@ -660,6 +1267,34 @@ This is critical for optional parameters where `0` means "use server default".
 - This method handles HTTP request building, execution, and response parsing
 - Do NOT call `http.Client.Do()` directly in API methods
 
+### Method Signature
+
+```go
+func (c *Client) request(method string, requestURL *url.URL, headers http.Header, body, result any) (responseHeaders http.Header, err error)
+```
+
+**Parameters:**
+- `method`: HTTP method (GET, POST, PUT, DELETE, etc.)
+- `requestURL`: Full URL constructed with `JoinPath()`
+- `headers`: Optional HTTP headers (nil for most cases)
+- `body`: Request body (string, url.Values, struct/map, or io.Reader for multipart)
+- `result`: Pointer to result struct, `*bytes.Buffer` for raw response, or nil for no response
+
+**Returns:**
+- `responseHeaders`: HTTP response headers (for advanced use cases)
+- `err`: Error if request failed
+
+### Automatic Content-Type Handling
+
+The `request()` method automatically sets Content-Type based on body type:
+
+| Body Type | Content-Type |
+|-----------|-------------|
+| `string` | `text/plain; charset=utf-8` |
+| `url.Values` | `application/x-www-form-urlencoded` |
+| `struct`/`map` | `application/json; charset=utf-8` |
+| `io.Reader` | Must set manually via headers (for multipart forms) |
+
 ### Supported Body Types
 
 ```go
@@ -785,6 +1420,94 @@ if resp.Header.Get("Content-Type") == "application/xml" {
 
 **Before considering a category complete, verify all items in this checklist:**
 
+### Testing Guidelines
+
+**When adding new functionality:**
+
+1. **Unit Tests**: Test validation logic and edge cases
+2. **Integration Tests**: Test actual API calls (if test environment available)
+3. **Error Cases**: Test all error paths and status codes
+
+**Example test structure:**
+
+```go
+func TestCreateWorkspaceRequest_Validate(t *testing.T) {
+    tests := []struct {
+        name    string
+        req     CreateWorkspaceRequest
+        wantErr bool
+        errMsg  string
+    }{
+        {
+            name:    "valid request",
+            req:     CreateWorkspaceRequest{ID: "valid-id"},
+            wantErr: false,
+        },
+        {
+            name:    "missing id",
+            req:     CreateWorkspaceRequest{ID: ""},
+            wantErr: true,
+            errMsg:  "id is required",
+        },
+        {
+            name:    "invalid characters",
+            req:     CreateWorkspaceRequest{ID: "invalid@id"},
+            wantErr: true,
+            errMsg:  "must contain only letters, numbers, underscores, or hyphens",
+        },
+    }
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            err := tt.req.Validate()
+            if (err != nil) != tt.wantErr {
+                t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
+            }
+            if err != nil && tt.errMsg != "" && !strings.Contains(err.Error(), tt.errMsg) {
+                t.Errorf("Validate() error = %v, want error containing %q", err, tt.errMsg)
+            }
+        })
+    }
+}
+```
+
+### Examples
+
+**Complete method implementation example:**
+
+```go
+// GetPeer gets a Peer by ID.
+//
+// Retrieves a specific peer from the workspace by its unique identifier.
+// Returns the peer's current state including metadata and configuration.
+//
+// https://docs.honcho.dev/v3/api-reference/endpoint/peers/get-peer
+func (c *Client) GetPeer(workspaceID, peerID string) (result *Peer, err error) {
+    // Validate path parameters
+    if workspaceID == "" {
+        err = errors.New("workspaceID is required")
+        return
+    }
+    if peerID == "" {
+        err = errors.New("peerID is required")
+        return
+    }
+    // Construct URL
+    requestURL := c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "peers", peerID)
+    // Initialize result
+    result = new(Peer)
+    // Make request
+    if _, err = c.request(http.MethodGet, requestURL, nil, nil, &result); err != nil {
+        err = fmt.Errorf("failed to get peer: %w", err)
+        return
+    }
+    return
+}
+```
+
+---
+
+**Before considering a category complete, verify all items in this checklist:**
+
 ### Type Location Check
 
 ```bash
@@ -858,46 +1581,91 @@ grep "type.*struct" peer.go        # Should find nothing
 
 ### DO:
 
+**File Organization:**
 - ✅ Organize by category (`category.go`/`category_types.go`)
 - ✅ Separate types (`*_types.go`) from methods (`*.go`)
 - ✅ Verify type locations after implementation
 - ✅ Define types in their canonical category file
+
+**Constants & URLs:**
 - ✅ Reuse `workspaceBaseURI` constant from `workspace.go` for endpoints starting with `/v3/workspaces`
 - ✅ Create a new `*BaseURI` constant only for genuinely different base paths (e.g., `/v3/keys`)
-- ✅ Use named returns and naked returns
+- ✅ Use `JoinPath()` for URL construction (never concatenate strings)
+
+**Method Implementation:**
+- ✅ Use named returns: `(result *Type, err error)`
+- ✅ Use naked returns (no explicit return values)
 - ✅ Validate mandatory parameters with `Validate()` methods
-- ✅ Copy validation constraints exactly from the OpenAPI spec
-- ✅ Allow 0 for optional int fields where 0 means "use server default"
+- ✅ Use the low-level `request()` method for all API calls
+- ✅ Match parameter order patterns (req before options)
+
+**Error Handling:**
+- ✅ Wrap errors with context using `%w`
+- ✅ Use `fmt.Errorf("item %d: %w", index, err)` for error messages in loops
+- ✅ Check errors immediately and return early
+
+**Documentation:**
+- ✅ Include descriptive block comments AND API doc URLs
+- ✅ Always use 2+ paragraphs (summary + context from API docs)
+- ✅ Document struct field default values and constraints
+
+**Types:**
 - ✅ Use `any` instead of `interface{}`
 - ✅ Use pointers for optional nested structs
-- ✅ Wrap errors with context using `%w`
-- ✅ Include descriptive block comments AND API doc URLs
-- ✅ Use the low-level `request()` method for all API calls
-- ✅ Document struct field default values and constraints
+- ✅ Allow 0 for optional int fields where 0 means "use server default"
+- ✅ Copy validation constraints exactly from the OpenAPI spec
 - ✅ Implement ALL schemas and HTTP status codes from the API docs
-- ✅ Use `fmt.Errorf("item %d: %w", index, err)` for error messages in loops
-- ✅ Pass `bytes.Buffer` directly to `request()` for multipart forms
+
+**Multipart Forms:**
+- ✅ Pass `bytes.Buffer` directly to `request()` (never `buffer.String()`)
+- ✅ Close multipart writer before making request
+- ✅ Set Content-Type header with `writer.FormDataContentType()`
+
+**Validation:**
 - ✅ Omit `Validate()` method entirely if ALL fields are optional
 - ✅ Omit `req.Validate()` call when `Validate()` method doesn't exist
 
 ### DON'T:
 
+**File Organization:**
 - ❌ Mix categories or leave types in the wrong category file
+- ❌ Define struct types in `{category}.go` files (types belong in `*_types.go`)
+
+**Constants & URLs:**
 - ❌ Define `*BaseURI` constants for paths that start with `/v3/workspaces` (always use `workspaceBaseURI`)
 - ❌ Create new `*BaseURI` constants unnecessarily (only for truly different base paths like `/v3/keys`)
+- ❌ Hardcode full URLs or concatenate path strings manually
+
+**Method Implementation:**
 - ❌ Omit descriptive block comments for methods
 - ❌ **Use one-liner block comments** - always include 2+ paragraphs with API description
 - ❌ **Omit the second paragraph** even for "obvious" or simple endpoints
-- ❌ Validate optional parameters (server handles those)
-- ❌ Approximate validation constraints
-- ❌ Hardcode full URLs
-- ❌ Use `interface{}` (use `any`)
 - ❌ Call `http.Client.Do()` directly in API methods
-- ❌ Return explicit values on naked returns
-- ❌ Leave struct fields undocumented
-- ❌ Ignore error schemas or HTTP status codes from the API docs
+- ❌ Return explicit values on naked returns (`return nil, err`)
+
+**Error Handling:**
 - ❌ Use string concatenation for error messages in loops
+- ❌ Return error types without `Error()` method implementation
+- ❌ Forget to wrap errors with `%w` for error chain support
+
+**Documentation:**
+- ❌ Leave struct fields undocumented
+- ❌ Omit API doc URLs from method comments
+
+**Types:**
+- ❌ Use `interface{}` (use `any`)
+- ❌ Use value types for optional nested structs (use pointers)
+- ❌ Approximate validation constraints (copy exactly from spec)
+- ❌ Ignore error schemas or HTTP status codes from the API docs
+
+**Multipart Forms:**
 - ❌ Convert multipart `bytes.Buffer` to string with `buffer.String()`
+- ❌ Forget to close the multipart writer before making request
+- ❌ Forget to set Content-Type header with boundary
+
+**Validation:**
+- ❌ Validate optional parameters (server handles those)
 - ❌ Add `Validate()` method when ALL fields are optional
 - ❌ Call `req.Validate()` when ALL fields are optional (method doesn't exist)
 - ❌ Leave `Validate()` calls after removing the `Validate()` method
+- ❌ Reject 0 for optional int fields where 0 means "use server default"
