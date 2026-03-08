@@ -189,8 +189,13 @@ type GetPeerContextOptions struct {
 }
 
 // ✅ Pointer for bool when you need 3-way logic (configuration updates)
+// CRITICAL: Do NOT use omitempty with *bool for config fields
+// - nil → sent as JSON null (means "don't change this field")
+// - true → sent as true (enable)
+// - false → sent as false (disable)
+// With omitempty, false would be omitted, breaking the 3-state logic
 type SessionPeerConfig struct {
-    ObserveMe *bool `json:"observe_me,omitempty"`  // nil = keep existing, true/false = change
+    ObserveMe *bool `json:"observe_me"`  // nil = null (don't change), true = enable, false = disable
 }
 ```
 
@@ -1124,36 +1129,93 @@ type ListConclusionsOptions struct {
 }
 
 // ✅ Document when pointer is needed (3-way logic)
+// CRITICAL: Do NOT use omitempty on *bool config fields
+// - nil → sent as JSON null (means "don't change this field")
+// - true → sent as true (enable)
+// - false → sent as false (disable)
+// If you use omitempty, false values will be omitted from JSON, preventing users from disabling features
 type SessionPeerConfig struct {
     // ObserveMe indicates whether to enable observation (optional)
-    ObserveMe *bool `json:"observe_me,omitempty"`  // nil = keep existing, true/false = change
+    ObserveMe *bool `json:"observe_me"`  // nil = null (don't change), true = enable, false = disable
     
     // ObserveOthers indicates whether to observe other peers (optional)
-    ObserveOthers *bool `json:"observe_others,omitempty"`  // nil = keep existing
+    ObserveOthers *bool `json:"observe_others"`  // nil = null (don't change), true/false = change
 }
 
 // ❌ Avoid ambiguous documentation
 // TopK is the number of results to return (min: 1, max: 100)  // doesn't mention 0!
+
+// ❌ WRONG: Using omitempty with *bool breaks 3-state logic
+type WrongSessionPeerConfig struct {
+    ObserveMe *bool `json:"observe_me,omitempty"`  // WRONG - false is omitted, can't disable!
+}
 ```
 
 This is critical for optional parameters where `0` means "use server default".
 
 **Boolean Field Decision Guide:**
 
+The key question is: **Do you need to distinguish between "not set" and "explicitly false"?**
+
 ```go
-// ✅ Use bool with omitempty for pagination/filters (false = default)
+// ✅ Use bool with omitempty for pagination/filters (false = server default)
+// When false is the server default and you never need to explicitly send false
 type GetMessagesOptions struct {
-    Reverse bool `json:"reverse,omitempty"`  // false omitted from JSON
+    // Reverse is whether to reverse the order of results (default: false)
+    Reverse bool `json:"reverse,omitempty"`  // false omitted, true sent
 }
 
-// ✅ Use *bool for configuration updates (need 3-way logic)
+// ✅ Use *bool WITHOUT omitempty for configuration updates (3-way logic)
+// When you need: nil = "don't change", true = "enable", false = "disable"
+// CRITICAL: NO omitempty - it would prevent sending false values
 type SessionPeerConfig struct {
-    ObserveMe *bool `json:"observe_me,omitempty"`  // nil = don't change
+    // ObserveMe indicates whether to enable observation (optional)
+    // nil = null in JSON (don't change), true = enable, false = disable
+    ObserveMe *bool `json:"observe_me"`  // NO omitempty!
 }
 
-// ❌ Don't use *bool for simple flags
-Reverse *bool `json:"reverse,omitempty"`  // unnecessarily complex
+// ✅ Use *bool for optional fields where 0/empty string distinction matters
+type GetPeerContextOptions struct {
+    // SearchTopK: nil = not provided, 0 = explicitly zero
+    SearchTopK *int `json:"search_top_k,omitempty"`  // omitempty OK for *int/*string
+}
+
+// ❌ WRONG: *bool with omitempty can't send false
+type WrongConfig struct {
+    ObserveMe *bool `json:"observe_me,omitempty"`  // false is omitted - broken!
+}
+
+// ❌ WRONG: *bool for simple flags is overkill
+type OverkillOptions struct {
+    Reverse *bool `json:"reverse,omitempty"`  // just use bool if false = default
+}
 ```
+
+**Quick Decision Tree for Boolean Fields:**
+
+```
+Is the field used in a configuration update (PUT/PATCH)?
+├─ YES → Do you need "don't change" option?
+│  ├─ YES → Use *bool WITHOUT omitempty (nil=null, true/false sent)
+│  │  Example: SessionPeerConfig.ObserveMe
+│  └─ NO → Use bool with omitempty (false=default)
+│     Example: DialecticOptions.Stream
+│
+└─ NO (GET request, query params, filters)
+   └─ Is false the server default?
+      ├─ YES → Use bool with omitempty (false omitted)
+      │  Example: GetMessagesOptions.Reverse
+      └─ NO → Use *bool without omitempty (rare)
+```
+
+**Why This Matters:**
+
+The Honcho API accepts `anyOf: [boolean, null]` for configuration fields. This means:
+- `null` = keep existing value (don't change this field)
+- `true` = enable this feature
+- `false` = disable this feature
+
+If you use `omitempty` with `*bool`, Go's JSON marshaler omits both `nil` AND `false` values, making it impossible to disable features. Always use `*bool` **without** `omitempty` for configuration fields that support 3-state logic.
 
 ---
 
