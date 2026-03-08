@@ -753,7 +753,6 @@ peers := map[string]*honcho.SessionPeerConfig{
 
 For complete API documentation, visit:
 
-- **API Index**: https://docs.honcho.dev/llms.txt
 - **Workspaces**: https://docs.honcho.dev/v3/api-reference/endpoint/workspaces
 - **Peers**: https://docs.honcho.dev/v3/api-reference/endpoint/peers
 - **Sessions**: https://docs.honcho.dev/v3/api-reference/endpoint/sessions
@@ -761,8 +760,6 @@ For complete API documentation, visit:
 - **Conclusions**: https://docs.honcho.dev/v3/api-reference/endpoint/conclusions
 - **Webhooks**: https://docs.honcho.dev/v3/api-reference/endpoint/webhooks
 - **API Keys**: https://docs.honcho.dev/v3/api-reference/endpoint/keys
-
-**SDK Source:** https://github.com/hekmon/go-honcho
 
 ## License
 
