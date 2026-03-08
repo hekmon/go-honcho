@@ -82,6 +82,25 @@ Is it a boolean field?
 
 This SDK provides a Go client for the Honcho API v3. All implementations must follow the patterns and conventions documented here to ensure consistency, type safety, and maintainability.
 
+### Document Separation
+
+This project maintains two distinct documentation files:
+
+- **README.md** → **End-user documentation** (how to use the SDK)
+  - Installation instructions
+  - Quick start examples
+  - API usage patterns
+  - Best practices for application developers
+
+- **AGENT.md** → **Developer guidelines** (how to implement/maintain the SDK)
+  - Implementation patterns and conventions
+  - Coding standards and style rules
+  - File organization structure
+  - API endpoint implementation guidelines
+  - Validation and error handling rules
+
+**This file (AGENT.md) is intended for SDK implementers and maintainers, not end users.**
+
 ### Core Principles
 
 - **Type Safety**: All API requests and responses use strongly-typed structs
