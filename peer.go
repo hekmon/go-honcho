@@ -12,7 +12,7 @@ import (
 // If peer_id is provided as a query parameter, it uses that (must match JWT workspace_id).
 // Otherwise, it uses the peer_id from the JWT.
 //
-/* https://docs.honcho.dev/v3/api-reference/endpoint/peers/get-or-create-peer.md */
+// https://docs.honcho.dev/v3/api-reference/endpoint/peers/get-or-create-peer
 func (c *Client) GetOrCreatePeer(workspaceID string, req PeerCreate) (result *Peer, err error) {
 	if workspaceID == "" {
 		err = errors.New("workspaceID is required")
@@ -34,7 +34,7 @@ func (c *Client) GetOrCreatePeer(workspaceID string, req PeerCreate) (result *Pe
 
 // GetAllPeers gets all Peers for a Workspace, paginated with optional filters.
 //
-/* https://docs.honcho.dev/v3/api-reference/endpoint/peers/get-peers.md */
+// https://docs.honcho.dev/v3/api-reference/endpoint/peers/get-peers
 func (c *Client) GetAllPeers(workspaceID string, req *PeerGet, opts *GetAllPeersOptions) (result *PagePeer, err error) {
 	if workspaceID == "" {
 		err = errors.New("workspaceID is required")
@@ -64,7 +64,7 @@ func (c *Client) GetAllPeers(workspaceID string, req *PeerGet, opts *GetAllPeers
 
 // UpdatePeer updates a Peer's metadata and/or configuration.
 //
-/* https://docs.honcho.dev/v3/api-reference/endpoint/peers/update-peer.md */
+// https://docs.honcho.dev/v3/api-reference/endpoint/peers/update-peer
 func (c *Client) UpdatePeer(workspaceID, peerID string, req PeerUpdate) (result *Peer, err error) {
 	if workspaceID == "" {
 		err = errors.New("workspaceID is required")
@@ -94,7 +94,7 @@ func (c *Client) UpdatePeer(workspaceID, peerID string, req PeerUpdate) (result 
 // If a target is provided, we get the Representation of the target from the perspective of the Peer.
 // If no target is provided, we get the omniscient Honcho Representation of the Peer.
 //
-/* https://docs.honcho.dev/v3/api-reference/endpoint/peers/get-representation.md */
+// https://docs.honcho.dev/v3/api-reference/endpoint/peers/get-representation
 func (c *Client) GetRepresentation(workspaceID, peerID string, req PeerRepresentationGet) (result *RepresentationResponse, err error) {
 	if workspaceID == "" {
 		err = errors.New("workspaceID is required")
@@ -120,7 +120,7 @@ func (c *Client) GetRepresentation(workspaceID, peerID string, req PeerRepresent
 // Returns the peer card that the observer peer has for the target peer if it exists.
 // If no target is specified, returns the observer's own peer card.
 //
-/* https://docs.honcho.dev/v3/api-reference/endpoint/peers/get-peer-card.md */
+// https://docs.honcho.dev/v3/api-reference/endpoint/peers/get-peer-card
 func (c *Client) GetPeerCard(workspaceID, peerID string, target *string) (result *PeerCardResponse, err error) {
 	if workspaceID == "" {
 		err = errors.New("workspaceID is required")
@@ -152,7 +152,7 @@ func (c *Client) GetPeerCard(workspaceID, peerID string, target *string) (result
 // Sets the peer card that the observer peer has for the target peer.
 // If no target is specified, sets the observer's own peer card.
 //
-/* https://docs.honcho.dev/v3/api-reference/endpoint/peers/set-peer-card.md */
+// https://docs.honcho.dev/v3/api-reference/endpoint/peers/set-peer-card
 func (c *Client) SetPeerCard(workspaceID, peerID string, req PeerCardSet, target *string) (result *PeerCardResponse, err error) {
 	if workspaceID == "" {
 		err = errors.New("workspaceID is required")
@@ -190,7 +190,7 @@ func (c *Client) SetPeerCard(workspaceID, peerID string, req PeerCardSet, target
 //
 // This is useful for getting all the context needed about a peer without making multiple API calls.
 //
-/* https://docs.honcho.dev/v3/api-reference/endpoint/peers/get-peer-context.md */
+// https://docs.honcho.dev/v3/api-reference/endpoint/peers/get-peer-context
 func (c *Client) GetPeerContext(workspaceID, peerID string, opts *GetPeerContextOptions) (result *PeerContext, err error) {
 	if workspaceID == "" {
 		err = errors.New("workspaceID is required")
@@ -236,7 +236,7 @@ func (c *Client) GetPeerContext(workspaceID, peerID string, opts *GetPeerContext
 
 // GetSessionsForPeer gets all Sessions for a Peer, paginated with optional filters.
 //
-/* https://docs.honcho.dev/v3/api-reference/endpoint/peers/get-sessions-for-peer.md */
+// https://docs.honcho.dev/v3/api-reference/endpoint/peers/get-sessions-for-peer
 func (c *Client) GetSessionsForPeer(workspaceID, peerID string, req *SessionGet, opts *GetSessionsForPeerOptions) (result *PageSession, err error) {
 	if workspaceID == "" {
 		err = errors.New("workspaceID is required")
@@ -270,7 +270,7 @@ func (c *Client) GetSessionsForPeer(workspaceID, peerID string, req *SessionGet,
 
 // SearchPeer searches a Peer's messages, optionally filtered by various criteria.
 //
-/* https://docs.honcho.dev/v3/api-reference/endpoint/peers/search-peer.md */
+// https://docs.honcho.dev/v3/api-reference/endpoint/peers/search-peer
 func (c *Client) SearchPeer(workspaceID, peerID string, req MessageSearchOptions) (result *[]Message, err error) {
 	if workspaceID == "" {
 		err = errors.New("workspaceID is required")
@@ -299,7 +299,7 @@ func (c *Client) SearchPeer(workspaceID, peerID string, req MessageSearchOptions
 // Performs agentic search and reasoning to comprehensively answer the query based on
 // all latent knowledge gathered about the peer from their messages and conclusions.
 //
-/* https://docs.honcho.dev/v3/api-reference/endpoint/peers/chat.md */
+// https://docs.honcho.dev/v3/api-reference/endpoint/peers/chat
 func (c *Client) Chat(workspaceID, peerID string, req DialecticOptions) (result *DialecticResponse, err error) {
 	if workspaceID == "" {
 		err = errors.New("workspaceID is required")

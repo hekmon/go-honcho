@@ -81,18 +81,22 @@ const (
 
 ### API References
 
-**Include Honcho docs URL with `.md` extension in block comments:**
+**Include Honcho docs URL in block comments (WITHOUT `.md` extension for IDE visibility):**
 
 ```go
-/* https://docs.honcho.dev/v3/api-reference/endpoint/workspaces/get-or-create-workspace.md */
+// https://docs.honcho.dev/v3/api-reference/endpoint/workspaces/get-or-create-workspace
 func (c *Client) GetOrCreateWorkspace(req CreateWorkspaceRequest) (result *Workspace, err error) {
 ```
+
+**Note for Agents:** When fetching documentation, append `.md` to the URL:
+- Agent fetch: `https://docs.honcho.dev/v3/api-reference/endpoint/workspaces/get-or-create-workspace.md`
+- IDE comment: `https://docs.honcho.dev/v3/api-reference/endpoint/workspaces/get-or-create-workspace`
 
 ### Documentation Trick
 
 Honcho docs support `.md` extension for direct markdown access:
-- Individual endpoint: `https://docs.honcho.dev/v3/api-reference/endpoint/workspaces/get-or-create-workspace.md`
 - API Index: `https://docs.honcho.dev/llms.txt`
+- Individual endpoint (for agents): Add `.md` to any docs URL
 
 ### Complete API Schema Implementation
 
@@ -442,7 +446,8 @@ import (
 - ✅ Use pointers for optional nested structs
 - ✅ Use `baseURL.JoinPath()` for URL construction
 - ✅ Wrap errors with context using `%w`
-- ✅ Include `.md` API doc URLs in block comments
+- ✅ Include API doc URLs in block comments (without `.md` - for IDE visibility)
+- ✅ Agents should append `.md` when fetching documentation
 - ✅ Use the low-level `request()` method for all API calls
 - ✅ Extend `request()` when new body/result types are needed
 - ✅ Document struct field default values and constraints
@@ -455,7 +460,7 @@ import (
 
 - ❌ Mix categories in the same file
 - ❌ Define redundant base URI constants (reuse `workspaceBaseURI` from `workspace.go`)
-- ❌ Omit `.md` documentation links for methods
+- ❌ Omit documentation links for methods
 - ❌ Mix types and methods in the same file
 - ❌ Validate optional parameters (server handles those)
 - ❌ Hardcode full URLs

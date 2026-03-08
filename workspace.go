@@ -16,7 +16,7 @@ const (
 // Provide the desired workspace ID in the request. If the workspace exists,
 // it will be returned. If it doesn't exist, it will be created with that ID.
 //
-/* https://docs.honcho.dev/v3/api-reference/endpoint/workspaces/get-or-create-workspace.md */
+// https://docs.honcho.dev/v3/api-reference/endpoint/workspaces/get-or-create-workspace
 func (c *Client) GetOrCreateWorkspace(req CreateWorkspaceRequest) (result *Workspace, err error) {
 	if err = req.Validate(); err != nil {
 		return
@@ -34,7 +34,7 @@ func (c *Client) GetOrCreateWorkspace(req CreateWorkspaceRequest) (result *Works
 
 // GetAllWorkspaces gets all Workspaces, paginated with optional filters.
 //
-/* https://docs.honcho.dev/v3/api-reference/endpoint/workspaces/get-all-workspaces.md */
+// https://docs.honcho.dev/v3/api-reference/endpoint/workspaces/get-all-workspaces
 func (c *Client) GetAllWorkspaces(req WorkspaceGetRequest, opts *GetAllWorkspacesOptions) (result *PageWorkspace, err error) {
 	requestURL := c.baseURL.JoinPath(workspaceBaseURI, "list")
 	if opts != nil {
@@ -60,7 +60,7 @@ func (c *Client) GetAllWorkspaces(req WorkspaceGetRequest, opts *GetAllWorkspace
 
 // UpdateWorkspace updates a Workspace's metadata and/or configuration.
 //
-/* https://docs.honcho.dev/v3/api-reference/endpoint/workspaces/update-workspace.md */
+// https://docs.honcho.dev/v3/api-reference/endpoint/workspaces/update-workspace
 func (c *Client) UpdateWorkspace(workspaceID string, req UpdateWorkspaceRequest) (result *Workspace, err error) {
 	if workspaceID == "" {
 		err = errors.New("workspaceID is required")
@@ -83,7 +83,7 @@ func (c *Client) UpdateWorkspace(workspaceID string, req UpdateWorkspaceRequest)
 // Returns 409 Conflict if the workspace contains active sessions. Delete all sessions first, then delete the workspace.
 // This action cannot be undone.
 //
-/* https://docs.honcho.dev/v3/api-reference/endpoint/workspaces/delete-workspace.md */
+// https://docs.honcho.dev/v3/api-reference/endpoint/workspaces/delete-workspace
 func (c *Client) DeleteWorkspace(workspaceID string) (err error) {
 	if workspaceID == "" {
 		err = errors.New("workspaceID is required")
@@ -105,7 +105,7 @@ func (c *Client) DeleteWorkspace(workspaceID string) (err error) {
 // (reconciler, webhook, deletion) are excluded. Note: completed counts reflect items since the last
 // periodic queue cleanup, not lifetime totals.
 //
-/* https://docs.honcho.dev/v3/api-reference/endpoint/workspaces/get-queue-status.md */
+// https://docs.honcho.dev/v3/api-reference/endpoint/workspaces/get-queue-status
 func (c *Client) GetQueueStatus(workspaceID string, observerID, senderID, sessionID *string) (result *QueueStatus, err error) {
 	if workspaceID == "" {
 		err = errors.New("workspaceID is required")
@@ -140,7 +140,7 @@ func (c *Client) GetQueueStatus(workspaceID string, observerID, senderID, sessio
 // and schedules the dream task for a future execution. Currently this endpoint only supports scheduling
 // immediate dreams.
 //
-/* https://docs.honcho.dev/v3/api-reference/endpoint/workspaces/schedule-dream.md */
+// https://docs.honcho.dev/v3/api-reference/endpoint/workspaces/schedule-dream
 func (c *Client) ScheduleDream(workspaceID string, req ScheduleDreamRequest) (err error) {
 	if workspaceID == "" {
 		err = errors.New("workspaceID is required")
@@ -161,7 +161,7 @@ func (c *Client) ScheduleDream(workspaceID string, req ScheduleDreamRequest) (er
 
 // SearchWorkspace searches messages in a Workspace using optional filters.
 //
-/* https://docs.honcho.dev/v3/api-reference/endpoint/workspaces/search-workspace.md */
+// https://docs.honcho.dev/v3/api-reference/endpoint/workspaces/search-workspace
 func (c *Client) SearchWorkspace(workspaceID string, req MessageSearchOptions) (result *[]Message, err error) {
 	if workspaceID == "" {
 		err = errors.New("workspaceID is required")
