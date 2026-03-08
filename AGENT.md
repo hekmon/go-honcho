@@ -111,9 +111,11 @@ SearchTopK int `json:"search_top_k,omitempty"`  // can't tell if 0 means "not se
 
 ### Base URI Constant
 
-**All API endpoints share the same base URI `/v3/workspaces`. Define `workspaceBaseURI` once and reuse it in all category files:**
+**Most endpoints start with `/v3/workspaces`. Define `workspaceBaseURI` once in `workspace.go` and reuse it in ALL category files that use this base path:**
 
-**Note:** If you encounter an endpoint that does NOT start with `/v3/workspaces`, create a new constant for that specific base path.
+**Decision rule:** Check the OpenAPI spec's endpoint path:
+- If path starts with `/v3/workspaces` → **reuse `workspaceBaseURI`** (e.g., `/v3/workspaces/{id}/peers`, `/v3/workspaces/{id}/webhooks`)
+- If path starts with a **different base** → **create a new `*BaseURI` constant** (e.g., `/v3/keys`, `/v3/admin`)
 
 ```go
 // ✅ In workspace.go - define once
@@ -121,17 +123,24 @@ const (
     workspaceBaseURI = "/v3/workspaces"
 )
 
-// ✅ In peer.go, session.go, etc. - reuse workspaceBaseURI
+// ✅ In peer.go, session.go, webhook.go, etc. - ALWAYS reuse workspaceBaseURI
 requestURL := c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "peers")
+requestURL := c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "webhooks")
 
-// ❌ Don't define redundant constants per category
+// ✅ In key.go - different base path, so create keyBaseURI
 const (
-    peerBaseURI = "/v3/workspaces"  // redundant!
+    keyBaseURI = "/v3/keys"  // ✅ correct - genuinely different base path
+)
+requestURL := c.baseURL.JoinPath(keyBaseURI)
+
+// ❌ Don't define redundant constants for /v3/workspaces paths
+const (
+    peerBaseURI = "/v3/workspaces"  // WRONG! Just use workspaceBaseURI
 )
 
-// ❌ Don't create new constants unnecessarily - only for truly different base paths
+// ❌ Don't create constants for path extensions
 const (
-    peerBaseURI = "/v3/workspaces/peers"  // wrong! this is just a path extension
+    peerBaseURI = "/v3/workspaces/peers"  // WRONG! This is workspaceBaseURI + "/peers"
 )
 ```
 
@@ -800,7 +809,7 @@ grep "type.*struct" peer.go        # Should find nothing
 - ✅ Errors wrapped with context using `%w`
 - ✅ Validation called ONLY if `Validate()` method exists on request type
 - ✅ No calls to `req.Validate()` when all fields are optional
-- ✅ Uses `workspaceBaseURI` constant (not hardcoded URLs)
+- ✅ Uses `workspaceBaseURI` constant for `/v3/workspaces` paths (or `*BaseURI` for genuinely different base paths like `/v3/keys`)
 - ✅ Uses `c.request()` method (not `http.Client.Do()`)
 - ✅ Error messages in loops use `fmt.Errorf("item %d: %w", index, err)` (not string concatenation)
 - ✅ Multipart forms pass `bytes.Buffer` directly (not `buffer.String()`)
@@ -833,7 +842,8 @@ grep "type.*struct" peer.go        # Should find nothing
 - ✅ Separate types (`*_types.go`) from methods (`*.go`)
 - ✅ Verify type locations after implementation
 - ✅ Define types in their canonical category file
-- ✅ Reuse `workspaceBaseURI` constant from `workspace.go`
+- ✅ Reuse `workspaceBaseURI` constant from `workspace.go` for endpoints starting with `/v3/workspaces`
+- ✅ Create a new `*BaseURI` constant only for genuinely different base paths (e.g., `/v3/keys`)
 - ✅ Use named returns and naked returns
 - ✅ Validate mandatory parameters with `Validate()` methods
 - ✅ Copy validation constraints exactly from the OpenAPI spec
@@ -853,7 +863,8 @@ grep "type.*struct" peer.go        # Should find nothing
 ### DON'T:
 
 - ❌ Mix categories or leave types in the wrong category file
-- ❌ Define redundant base URI constants
+- ❌ Define `*BaseURI` constants for paths that start with `/v3/workspaces` (always use `workspaceBaseURI`)
+- ❌ Create new `*BaseURI` constants unnecessarily (only for truly different base paths like `/v3/keys`)
 - ❌ Omit descriptive block comments for methods
 - ❌ Validate optional parameters (server handles those)
 - ❌ Approximate validation constraints
