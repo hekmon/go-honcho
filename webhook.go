@@ -77,6 +77,8 @@ func (c *Client) DeleteWebhookEndpoint(workspaceID, endpointID string) (err erro
 
 // TestEmit tests publishing a webhook event.
 //
+// This endpoint triggers a test webhook event to verify the endpoint is configured correctly.
+//
 // https://docs.honcho.dev/v3/api-reference/endpoint/webhooks/test-emit
 func (c *Client) TestEmit(workspaceID string) (err error) {
 	// Validate required parameters

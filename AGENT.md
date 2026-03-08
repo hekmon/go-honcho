@@ -195,10 +195,29 @@ func (c *Client) CreateConclusions(workspaceID string, req ConclusionBatchCreate
 - ✅ Include 1-3 sentences explaining what the endpoint does
 - ✅ Include the API doc URL (without `.md` extension)
 - ✅ Place the comment directly above the function signature
+- ✅ **Always use 2+ paragraphs** - first line summarizes, second paragraph provides additional context from the OpenAPI spec
+- ✅ **Copy the description from the OpenAPI spec** - even for simple endpoints, never use just a one-liner
 
 **Note for Agents:** When fetching documentation, append `.md` to the URL:
 - Agent fetch: `https://docs.honcho.dev/v3/api-reference/endpoint/workspaces/get-or-create-workspace.md`
 - IDE comment: `https://docs.honcho.dev/v3/api-reference/endpoint/workspaces/get-or-create-workspace`
+
+**Example for simple endpoints:**
+```go
+// ✅ Good: Simple endpoint with proper description
+// TestEmit tests publishing a webhook event.
+//
+// This endpoint triggers a test webhook event to verify the endpoint is configured correctly.
+//
+// https://docs.honcho.dev/v3/api-reference/endpoint/webhooks/test-emit
+func (c *Client) TestEmit(workspaceID string) (err error) {
+
+// ❌ Bad: Missing descriptive second paragraph
+// TestEmit tests publishing a webhook event.
+//
+// https://docs.honcho.dev/v3/api-reference/endpoint/webhooks/test-emit
+func (c *Client) TestEmit(workspaceID string) (err error) {
+```
 
 ### Documentation Trick
 
@@ -260,7 +279,7 @@ case http.StatusUnprocessableEntity:
 
 Before finalizing a method, verify:
 
-- [ ] Block comment with 1-3 sentence description
+- [ ] Block comment with **2+ paragraphs** (1st: what it does, 2nd: additional context/description from API docs)
 - [ ] API doc URL in block comment (without `.md` extension)
 - [ ] Named returns: `(result *Type, err error)`
 - [ ] Validation called ONLY if `Validate()` method exists on the request type
@@ -804,6 +823,7 @@ grep "type.*struct" peer.go        # Should find nothing
 
 **For each method:**
 - ✅ API doc URL in block comment (without `.md` extension)
+- ✅ Block comment has 2+ paragraphs with descriptive text from OpenAPI spec
 - ✅ Named returns used consistently
 - ✅ Naked returns used (no explicit return values)
 - ✅ Errors wrapped with context using `%w`
@@ -866,6 +886,8 @@ grep "type.*struct" peer.go        # Should find nothing
 - ❌ Define `*BaseURI` constants for paths that start with `/v3/workspaces` (always use `workspaceBaseURI`)
 - ❌ Create new `*BaseURI` constants unnecessarily (only for truly different base paths like `/v3/keys`)
 - ❌ Omit descriptive block comments for methods
+- ❌ **Use one-liner block comments** - always include 2+ paragraphs with API description
+- ❌ **Omit the second paragraph** even for "obvious" or simple endpoints
 - ❌ Validate optional parameters (server handles those)
 - ❌ Approximate validation constraints
 - ❌ Hardcode full URLs
