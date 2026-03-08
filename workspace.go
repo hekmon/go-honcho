@@ -1,6 +1,7 @@
 package honcho
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -49,6 +50,129 @@ func (c *Client) GetAllWorkspaces(req WorkspaceGetRequest, opts *GetAllWorkspace
 	result = new(PageWorkspace)
 	if _, err = c.request(
 		http.MethodPost, requestURL, nil,
+		req, &result,
+	); err != nil {
+		err = fmt.Errorf("failed to execute request: %w", err)
+		return
+	}
+	return
+}
+
+// UpdateWorkspace updates a Workspace's metadata and/or configuration.
+//
+/* https://docs.honcho.dev/v3/api-reference/endpoint/workspaces/update-workspace.md */
+func (c *Client) UpdateWorkspace(workspaceID string, req UpdateWorkspaceRequest) (result *Workspace, err error) {
+	if workspaceID == "" {
+		err = errors.New("workspaceID is required")
+		return
+	}
+	result = new(Workspace)
+	if _, err = c.request(
+		http.MethodPut, c.baseURL.JoinPath(workspaceBaseURI, workspaceID), nil,
+		req, &result,
+	); err != nil {
+		err = fmt.Errorf("failed to execute request: %w", err)
+		return
+	}
+	return
+}
+
+// DeleteWorkspace deletes a Workspace. This accepts the deletion request and processes it in the background,
+// permanently deleting all peers, messages, conclusions, and other resources associated with the workspace.
+//
+// Returns 409 Conflict if the workspace contains active sessions. Delete all sessions first, then delete the workspace.
+// This action cannot be undone.
+//
+/* https://docs.honcho.dev/v3/api-reference/endpoint/workspaces/delete-workspace.md */
+func (c *Client) DeleteWorkspace(workspaceID string) (err error) {
+	if workspaceID == "" {
+		err = errors.New("workspaceID is required")
+		return
+	}
+	if _, err = c.request(
+		http.MethodDelete, c.baseURL.JoinPath(workspaceBaseURI, workspaceID), nil,
+		nil, nil,
+	); err != nil {
+		err = fmt.Errorf("failed to execute request: %w", err)
+		return
+	}
+	return
+}
+
+// GetQueueStatus gets the processing queue status for a Workspace, optionally scoped to an observer, sender, and/or session.
+//
+// Only tracks user-facing task types (representation, summary, dream). Internal infrastructure tasks
+// (reconciler, webhook, deletion) are excluded. Note: completed counts reflect items since the last
+// periodic queue cleanup, not lifetime totals.
+//
+/* https://docs.honcho.dev/v3/api-reference/endpoint/workspaces/get-queue-status.md */
+func (c *Client) GetQueueStatus(workspaceID string, observerID, senderID, sessionID *string) (result *QueueStatus, err error) {
+	if workspaceID == "" {
+		err = errors.New("workspaceID is required")
+		return
+	}
+	requestURL := c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "queue", "status")
+	query := requestURL.Query()
+	if observerID != nil {
+		query.Set("observer_id", *observerID)
+	}
+	if senderID != nil {
+		query.Set("sender_id", *senderID)
+	}
+	if sessionID != nil {
+		query.Set("session_id", *sessionID)
+	}
+	requestURL.RawQuery = query.Encode()
+	result = new(QueueStatus)
+	if _, err = c.request(
+		http.MethodGet, requestURL, nil,
+		nil, &result,
+	); err != nil {
+		err = fmt.Errorf("failed to execute request: %w", err)
+		return
+	}
+	return
+}
+
+// ScheduleDream manually schedules a dream task for a specific collection.
+//
+// This endpoint bypasses all automatic dream conditions (document threshold, minimum hours between dreams)
+// and schedules the dream task for a future execution. Currently this endpoint only supports scheduling
+// immediate dreams.
+//
+/* https://docs.honcho.dev/v3/api-reference/endpoint/workspaces/schedule-dream.md */
+func (c *Client) ScheduleDream(workspaceID string, req ScheduleDreamRequest) (err error) {
+	if workspaceID == "" {
+		err = errors.New("workspaceID is required")
+		return
+	}
+	if err = req.Validate(); err != nil {
+		return
+	}
+	if _, err = c.request(
+		http.MethodPost, c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "schedule_dream"), nil,
+		req, nil,
+	); err != nil {
+		err = fmt.Errorf("failed to execute request: %w", err)
+		return
+	}
+	return
+}
+
+// SearchWorkspace searches messages in a Workspace using optional filters.
+//
+/* https://docs.honcho.dev/v3/api-reference/endpoint/workspaces/search-workspace.md */
+func (c *Client) SearchWorkspace(workspaceID string, req MessageSearchOptions) (result *[]Message, err error) {
+	if workspaceID == "" {
+		err = errors.New("workspaceID is required")
+		return
+	}
+	if err = req.Validate(); err != nil {
+		return
+	}
+	result = new([]Message)
+	if _, err = c.request(
+		http.MethodPost, c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "search"), nil,
 		req, &result,
 	); err != nil {
 		err = fmt.Errorf("failed to execute request: %w", err)

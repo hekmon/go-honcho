@@ -67,10 +67,19 @@ func (c *Client) request(method string, requestURL *url.URL, headers http.Header
 	// Parse response
 	responseHeaders = resp.Header
 	switch resp.StatusCode {
-	case http.StatusNoContent:
+	case http.StatusNoContent, http.StatusAccepted:
 		return
 	case http.StatusOK:
 		// continue
+	case http.StatusUnprocessableEntity:
+		// Decode validation error
+		var valErr HTTPValidationError
+		if err = json.NewDecoder(resp.Body).Decode(&valErr); err != nil {
+			err = fmt.Errorf("failed to decode validation error: %w", err)
+			return
+		}
+		err = fmt.Errorf("validation error: %w", &valErr)
+		return
 	default:
 		var builder strings.Builder
 		// line 1
@@ -111,4 +120,23 @@ func (c *Client) request(method string, requestURL *url.URL, headers http.Header
 		err = fmt.Errorf("unsupported result type: %T", result)
 	}
 	return
+}
+
+// HTTPValidationError represents a 422 validation error response
+type HTTPValidationError struct {
+	Detail []ValidationError `json:"detail"`
+}
+
+// Error implements the error interface for HTTPValidationError
+func (e *HTTPValidationError) Error() string {
+	return fmt.Sprintf("validation error: %v", e.Detail)
+}
+
+// ValidationError represents a single validation error
+type ValidationError struct {
+	Loc   []any  `json:"loc"`
+	Msg   string `json:"msg"`
+	Type  string `json:"type"`
+	Input any    `json:"input,omitempty"`
+	Ctx   any    `json:"ctx,omitempty"`
 }
