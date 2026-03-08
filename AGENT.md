@@ -1,221 +1,145 @@
 # Honcho Go SDK - Agent Guidelines
 
+This document provides comprehensive guidelines for implementing the Honcho Go SDK. Follow these rules to ensure consistency, completeness, and maintainability.
+
+## Table of Contents
+
+1. [File Organization](#file-organization)
+2. [Documentation & API Discovery](#documentation--api-discovery)
+3. [Implementation Pattern](#implementation-pattern)
+4. [Coding Style](#coding-style)
+5. [Validation](#validation)
+6. [URL Construction](#url-construction)
+7. [Low-Level Request Method](#low-level-request-method)
+8. [Constants & Imports](#constants--imports)
+9. [Summary](#summary)
+
+---
+
 ## File Organization
 
 ### Category Files
-- Each API category gets its own pair of files: `category.go` and `category_types.go`
-- Examples: `workspace.go`/`workspace_types.go`, `peer.go`/`peer_types.go`
+
+Each API category gets its own pair of files:
+
+- `{category}.go` - Method implementations
+- `{category}_types.go` - Type definitions
+
+**Example:** `workspace.go` / `workspace_types.go`, `peer.go` / `peer_types.go`
 
 ### Type Definitions
-- Place all struct types in `*_types.go` files (e.g., `workspace_types.go`)
-- Keep data structures separate from method implementations
+
+**Place all struct types in `*_types.go` files:**
+
+```go
+// ✅ In workspace_types.go
+type Workspace struct {
+    ID            string                  `json:"id"`
+    CreatedAt     time.Time               `json:"created_at"`
+    Metadata      map[string]any          `json:"metadata,omitempty"`
+    Configuration *WorkspaceConfiguration `json:"configuration,omitempty"`
+}
+```
 
 ### Method Implementations
-- Place methods in corresponding `*.go` files (e.g., `workspace.go`)
-- One file per resource category (workspace, peer, session, etc.)
+
+**Place methods in corresponding `*.go` files:**
+
+```go
+// ✅ In workspace.go
+func (c *Client) GetOrCreateWorkspace(req CreateWorkspaceRequest) (result *Workspace, err error) {
+    // implementation
+}
+```
 
 ### Base URI Constant
-- Each category file must define a constant for the base URI
-- This constant is shared by all methods in that category
+
+**Each category file must define a constant for the base URI:**
+
 ```go
 const (
     workspaceBaseURI = "/v3/workspaces"
 )
 ```
 
-## Coding Style
+---
 
-### Function Signatures
-```go
-// ✅ Use named returns
-func (c *Client) GetOrCreateWorkspace(req CreateWorkspaceRequest) (result *Workspace, err error)
+## Documentation & API Discovery
 
-// ❌ Avoid anonymous returns
-func (c *Client) GetOrCreateWorkspace(req CreateWorkspaceRequest) (*Workspace, error)
-```
+### API Index
 
-### Return Statements
-```go
-// ✅ Use naked returns for clarity
-if err != nil {
-    err = fmt.Errorf("failed to execute request: %w", err)
-    return
-}
-return
+**Start by discovering all available endpoints:**
 
-// ❌ Avoid redundant return values
-return nil, err
-return result, nil
-```
-
-### Error Handling
-```go
-// ✅ Wrap errors with context and use %w for chaining
-err = fmt.Errorf("failed to parse URL: %s", err)
-err = fmt.Errorf("failed to execute request: %w", err)
-
-// ✅ Check errors immediately and return early
-if err != nil {
-    return
-}
-```
-
-### Type Declarations
-```go
-// ✅ Use 'any' instead of 'interface{}'
-Metadata map[string]any `json:"metadata,omitempty"`
-
-// ✅ Use pointers for nested structs that can be omitempty
-Configuration *WorkspaceConfiguration `json:"configuration,omitempty"`
-
-// ❌ Avoid value types for optional nested structs
-Configuration WorkspaceConfiguration `json:"configuration,omitempty"`
-```
-
-## Struct Field Documentation
-
-### Default Values and Constraints
-When defining struct fields, especially for optional parameters, document default values and constraints:
-
-```go
-// ✅ Document defaults and constraints
-type GetAllWorkspacesOptions struct {
-    // Page is the page number (default: 1, minimum: 1)
-    Page int
-    // Size is the page size (default: 50, minimum: 1, maximum: 100)
-    Size int
-}
-
-// ❌ Avoid undocumented fields
-type GetAllWorkspacesOptions struct {
-    Page int
-    Size int
-}
-```
-
-This is critical for optional parameters where `0` means "use server default".
-
-## URL Construction
-
-### Endpoint Paths
-```go
-// ✅ Use constants for endpoint paths
-const (
-    workspaceBaseURI = "/v3/workspaces"
-)
-
-// ✅ Use baseURL.JoinPath() for clean URL construction
-requestURL := c.baseURL.JoinPath(workspaceBaseURI)
-
-// ❌ Avoid hardcoding full URLs
-requestURL, err := url.Parse("https://api.honcho.dev/v3/workspaces")
-```
-
-## Validation
-
-### Validate() Methods
-```go
-// ✅ Add Validate() for mandatory parameters only
-func (req CreateWorkspaceRequest) Validate() error {
-    if req.ID == "" {
-        return errors.New("id is required")
-    }
-    if len(req.ID) > 100 {
-        return errors.New("id must be 100 characters or less")
-    }
-    if !workspaceIDPattern.MatchString(req.ID) {
-        return errors.New("id must contain only letters, numbers, underscores, or hyphens")
-    }
-    return nil
-}
-
-// ❌ Don't validate optional parameters (let server handle those)
-```
-
-### Call Validation in Methods
-```go
-// ✅ Call Validate() at the start of methods
-func (c *Client) GetOrCreateWorkspace(req CreateWorkspaceRequest) (result *Workspace, err error) {
-    if err = req.Validate(); err != nil {
-        return
-    }
-    // ... rest of implementation
-}
-```
-
-## Documentation
+- **Complete API Index**: Fetch `https://docs.honcho.dev/llms.txt` to discover ALL available endpoints
+- Use the index to find all endpoints for a category and ensure complete implementation
 
 ### API References
-```go
-// ✅ Include Honcho docs URL with .md extension in block comment
-/*
-    https://docs.honcho.dev/v3/api-reference/endpoint/workspaces/get-or-create-workspace.md
-*/
 
-// GetOrCreateWorkspace gets a Workspace by ID or creates a new one.
+**Include Honcho docs URL with `.md` extension in block comments:**
+
+```go
+/* https://docs.honcho.dev/v3/api-reference/endpoint/workspaces/get-or-create-workspace.md */
 func (c *Client) GetOrCreateWorkspace(req CreateWorkspaceRequest) (result *Workspace, err error) {
 ```
 
 ### Documentation Trick
-- Honcho docs support `.md` extension for direct markdown access
-- Example: `https://docs.honcho.dev/v3/api-reference/endpoint/workspaces/get-or-create-workspace.md`
-- Use this for clean API documentation scraping
 
-## Low-Level Request Method
+Honcho docs support `.md` extension for direct markdown access:
+- Individual endpoint: `https://docs.honcho.dev/v3/api-reference/endpoint/workspaces/get-or-create-workspace.md`
+- API Index: `https://docs.honcho.dev/llms.txt`
 
-### Usage
-- All API methods MUST use the `request()` method from `request.go`
-- This method handles HTTP request building, execution, and response parsing
-- Do NOT call `http.Client.Do()` directly in API methods
+### Complete API Schema Implementation
 
-### Supported Body Types
-```go
-// ✅ String body (text/plain)
-body := "plain text"
+**ALL information in the endpoint `.md` URL must be implemented:**
 
-// ✅ URL Values (application/x-www-form-urlencoded)
-body := url.Values{"key": []string{"value"}}
+- ✅ ALL request/response schemas from the OpenAPI spec
+- ✅ ALL error types and HTTP status codes (e.g., 422 Validation Error)
+- ✅ Implement error types in `request.go` with proper handling per status code
 
-// ✅ Struct/Map (application/json) - default
-body := MyStruct{Field: "value"}
+```yaml
+# Example from OpenAPI spec - must be implemented:
+'422':
+  description: Validation Error
+  content:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/HTTPValidationError'
 ```
 
-### Supported Result Types
 ```go
-// ✅ No response body expected
-var result any = nil
+// ✅ Implement ALL error schemas from the API docs
+type HTTPValidationError struct {
+    Detail []ValidationError `json:"detail"`
+}
 
-// ✅ Raw response body
-result := new(bytes.Buffer)
+type ValidationError struct {
+    Loc   []any  `json:"loc"`
+    Msg   string `json:"msg"`
+    Type  string `json:"type"`
+    Input any    `json:"input,omitempty"`
+    Ctx   any    `json:"ctx,omitempty"`
+}
 
-// ✅ JSON decoding (default)
-result := new(MyStruct)
-```
-
-### Extending request()
-If you need to support additional input/output cases:
-
-1. **New body type**: Add a case in the body switch statement
-2. **New result type**: Add a case in the result switch statement  
-3. **New content type handling**: Add decoding logic in the response section
-4. **New status code handling**: Add case in the status code switch
-
-```go
-// Example: Adding XML support for result
-if resp.Header.Get("Content-Type") == "application/xml" {
-    if err = xml.NewDecoder(resp.Body).Decode(result); err != nil {
-        err = fmt.Errorf("failed to decode XML response: %w", err)
+// ✅ Handle ALL HTTP status codes from the API docs in request()
+case http.StatusUnprocessableEntity:
+    var valErr HTTPValidationError
+    if err = json.NewDecoder(resp.Body).Decode(&valErr); err != nil {
+        err = fmt.Errorf("failed to decode validation error: %w", err)
         return
     }
+    err = fmt.Errorf("validation error: %w", &valErr)
     return
-}
+
+// ❌ Don't ignore error schemas or HTTP status codes from the API docs
+// ❌ Don't leave error responses as generic strings
 ```
 
-**Important**: When extending `request()`, ensure backward compatibility and update this documentation.
+---
 
 ## Implementation Pattern
 
 ### Standard Method Structure
+
 ```go
 func (c *Client) MethodName(req RequestType) (result *ResultType, err error) {
     // 1. Validate mandatory parameters
@@ -240,9 +164,223 @@ func (c *Client) MethodName(req RequestType) (result *ResultType, err error) {
 }
 ```
 
-## Constants
+---
+
+## Coding Style
+
+### Function Signatures
+
+```go
+// ✅ Use named returns
+func (c *Client) GetOrCreateWorkspace(req CreateWorkspaceRequest) (result *Workspace, err error)
+
+// ❌ Avoid anonymous returns
+func (c *Client) GetOrCreateWorkspace(req CreateWorkspaceRequest) (*Workspace, error)
+```
+
+### Return Statements
+
+```go
+// ✅ Use naked returns for clarity
+if err != nil {
+    err = fmt.Errorf("failed to execute request: %w", err)
+    return
+}
+return
+
+// ❌ Avoid redundant return values
+return nil, err
+return result, nil
+```
+
+### Error Handling
+
+```go
+// ✅ Wrap errors with context and use %w for chaining
+err = fmt.Errorf("failed to parse URL: %s", err)
+err = fmt.Errorf("failed to execute request: %w", err)
+
+// ✅ Check errors immediately and return early
+if err != nil {
+    return
+}
+```
+
+### Error Types
+
+```go
+// ✅ Error types must implement Error() method and be wrapped with %w
+type HTTPValidationError struct {
+    Detail []ValidationError `json:"detail"`
+}
+
+func (e *HTTPValidationError) Error() string {
+    return fmt.Sprintf("validation error: %v", e.Detail)
+}
+
+// In request handling:
+err = fmt.Errorf("validation error: %w", &valErr)
+
+// ❌ Don't return error types without Error() method
+// ❌ Don't forget to wrap with %w for errors.As() support
+```
+
+### Type Declarations
+
+```go
+// ✅ Use 'any' instead of 'interface{}'
+Metadata map[string]any `json:"metadata,omitempty"`
+
+// ✅ Use pointers for nested structs that can be omitempty
+Configuration *WorkspaceConfiguration `json:"configuration,omitempty"`
+
+// ❌ Avoid value types for optional nested structs
+Configuration WorkspaceConfiguration `json:"configuration,omitempty"`
+```
+
+---
+
+## Validation
+
+### Validate() Methods
+
+**Add `Validate()` for mandatory parameters only:**
+
+```go
+// ✅ Add Validate() for mandatory parameters only
+func (req CreateWorkspaceRequest) Validate() error {
+    if req.ID == "" {
+        return errors.New("id is required")
+    }
+    if len(req.ID) > 100 {
+        return errors.New("id must be 100 characters or less")
+    }
+    if !workspaceIDPattern.MatchString(req.ID) {
+        return errors.New("id must contain only letters, numbers, underscores, or hyphens")
+    }
+    return nil
+}
+
+// ❌ Don't validate optional parameters (let server handle those)
+```
+
+### Call Validation in Methods
+
+```go
+// ✅ Call Validate() at the start of methods
+func (c *Client) GetOrCreateWorkspace(req CreateWorkspaceRequest) (result *Workspace, err error) {
+    if err = req.Validate(); err != nil {
+        return
+    }
+    // ... rest of implementation
+}
+```
+
+### Struct Field Documentation
+
+**Document default values and constraints for struct fields:**
+
+```go
+// ✅ Document defaults and constraints
+type GetAllWorkspacesOptions struct {
+    // Page is the page number (default: 1, minimum: 1)
+    Page int
+    // Size is the page size (default: 50, minimum: 1, maximum: 100)
+    Size int
+}
+
+// ❌ Avoid undocumented fields
+type GetAllWorkspacesOptions struct {
+    Page int
+    Size int
+}
+```
+
+This is critical for optional parameters where `0` means "use server default".
+
+---
+
+## URL Construction
+
+### Endpoint Paths
+
+```go
+// ✅ Use constants for endpoint paths
+const (
+    workspaceBaseURI = "/v3/workspaces"
+)
+
+// ✅ Use baseURL.JoinPath() for clean URL construction
+requestURL := c.baseURL.JoinPath(workspaceBaseURI)
+
+// ❌ Avoid hardcoding full URLs
+requestURL, err := url.Parse("https://api.honcho.dev/v3/workspaces")
+```
+
+---
+
+## Low-Level Request Method
+
+### Usage
+
+- All API methods MUST use the `request()` method from `request.go`
+- This method handles HTTP request building, execution, and response parsing
+- Do NOT call `http.Client.Do()` directly in API methods
+
+### Supported Body Types
+
+```go
+// ✅ String body (text/plain)
+body := "plain text"
+
+// ✅ URL Values (application/x-www-form-urlencoded)
+body := url.Values{"key": []string{"value"}}
+
+// ✅ Struct/Map (application/json) - default
+body := MyStruct{Field: "value"}
+```
+
+### Supported Result Types
+
+```go
+// ✅ No response body expected
+var result any = nil
+
+// ✅ Raw response body
+result := new(bytes.Buffer)
+
+// ✅ JSON decoding (default)
+result := new(MyStruct)
+```
+
+### Extending request()
+
+If you need to support additional input/output cases:
+
+1. **New body type**: Add a case in the body switch statement
+2. **New result type**: Add a case in the result switch statement  
+3. **New content type handling**: Add decoding logic in the response section
+4. **New status code handling**: Add case in the status code switch
+
+```go
+// Example: Adding XML support for result
+if resp.Header.Get("Content-Type") == "application/xml" {
+    if err = xml.NewDecoder(resp.Body).Decode(result); err != nil {
+        err = fmt.Errorf("failed to decode XML response: %w", err)
+        return
+    }
+    return
+}
+```
+
+**Important**: When extending `request()`, ensure backward compatibility and update this documentation.
+
+---
+
+## Constants & Imports
 
 ### Pattern Definitions
+
 ```go
 // ✅ Define regex patterns as package-level variables
 var workspaceIDPattern = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
@@ -253,9 +391,8 @@ const (
 )
 ```
 
-## Imports
-
 ### Clean Imports
+
 ```go
 // ✅ Group standard library imports
 import (
@@ -269,9 +406,12 @@ import (
 // ❌ Avoid unused imports
 ```
 
+---
+
 ## Summary
 
-**DO:**
+### DO:
+
 - ✅ Organize by category (`category.go`/`category_types.go`)
 - ✅ Define base URI constant per category (e.g., `workspaceBaseURI`)
 - ✅ Separate types (`*_types.go`) from methods (`*.go`)
@@ -285,8 +425,13 @@ import (
 - ✅ Use the low-level `request()` method for all API calls
 - ✅ Extend `request()` when new body/result types are needed
 - ✅ Document struct field default values and constraints
+- ✅ Implement ALL schemas from the API docs (request, response, errors)
+- ✅ Implement ALL HTTP status codes from the API docs
+- ✅ Give error types an `Error()` method and wrap with `%w`
+- ✅ Use `https://docs.honcho.dev/llms.txt` to discover all endpoints
 
-**DON'T:**
+### DON'T:
+
 - ❌ Mix categories in the same file
 - ❌ Omit base URI constant per category
 - ❌ Omit `.md` documentation links for methods
@@ -299,3 +444,5 @@ import (
 - ❌ Duplicate request/response handling logic
 - ❌ Return explicit values on naked returns
 - ❌ Leave struct fields undocumented (especially optional params)
+- ❌ Ignore error schemas or HTTP status codes from the API docs
+- ❌ Return error types without `Error()` method
