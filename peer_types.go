@@ -73,7 +73,7 @@ type PeerRepresentationGet struct {
 	// SearchMaxDistance is only used if SearchQuery is provided. Maximum distance to search for semantically relevant conclusions (0-1)
 	SearchMaxDistance *float64 `json:"search_max_distance,omitempty"`
 	// IncludeMostFrequent is only used if SearchQuery is provided. Whether to include the most frequent conclusions
-	IncludeMostFrequent *bool `json:"include_most_frequent,omitempty"`
+	IncludeMostFrequent *bool `json:"include_most_frequent"`
 	// MaxConclusions is only used if SearchQuery is provided. Maximum number of conclusions to include (1-100, default: 25)
 	MaxConclusions *int `json:"max_conclusions,omitempty"`
 }

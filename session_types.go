@@ -58,7 +58,7 @@ type SessionConfiguration struct {
 // ReasoningConfiguration represents the reasoning configuration
 type ReasoningConfiguration struct {
 	// Enabled indicates whether to enable reasoning functionality
-	Enabled *bool `json:"enabled,omitempty"`
+	Enabled *bool `json:"enabled"`
 	// CustomInstructions is TODO: currently unused. Custom instructions for the reasoning system
 	CustomInstructions *string `json:"custom_instructions,omitempty"`
 }
@@ -66,15 +66,15 @@ type ReasoningConfiguration struct {
 // PeerCardConfiguration represents the peer card configuration
 type PeerCardConfiguration struct {
 	// Use indicates whether to use peer card during reasoning process
-	Use *bool `json:"use,omitempty"`
+	Use *bool `json:"use"`
 	// Create indicates whether to generate peer card based on content
-	Create *bool `json:"create,omitempty"`
+	Create *bool `json:"create"`
 }
 
 // SummaryConfiguration represents the summary configuration
 type SummaryConfiguration struct {
 	// Enabled indicates whether to enable summary functionality
-	Enabled *bool `json:"enabled,omitempty"`
+	Enabled *bool `json:"enabled"`
 	// MessagesPerShortSummary is number of messages per short summary (minimum: 10)
 	MessagesPerShortSummary *int `json:"messages_per_short_summary,omitempty"`
 	// MessagesPerLongSummary is number of messages per long summary (minimum: 20, must be > messages_per_short_summary)
@@ -84,15 +84,15 @@ type SummaryConfiguration struct {
 // DreamConfiguration represents the dream configuration
 type DreamConfiguration struct {
 	// Enabled indicates whether to enable dream functionality
-	Enabled *bool `json:"enabled,omitempty"`
+	Enabled *bool `json:"enabled"`
 }
 
 // SessionPeerConfig represents the session-level configuration for a peer
 type SessionPeerConfig struct {
 	// ObserveMe indicates whether Honcho will use reasoning to form a representation of this peer
-	ObserveMe *bool `json:"observe_me,omitempty"`
+	ObserveMe *bool `json:"observe_me"`
 	// ObserveOthers indicates whether this peer should form a session-level theory-of-mind representation of other peers
-	ObserveOthers *bool `json:"observe_others,omitempty"`
+	ObserveOthers *bool `json:"observe_others"`
 }
 
 // SessionContext represents the response for getting session context

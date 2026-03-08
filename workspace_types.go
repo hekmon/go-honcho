@@ -48,26 +48,26 @@ type WorkspaceConfiguration struct {
 
 // ReasoningConfig represents the reasoning configuration
 type ReasoningConfig struct {
-	Enabled            bool   `json:"enabled,omitempty"`
-	CustomInstructions string `json:"custom_instructions,omitempty"`
+	Enabled            *bool   `json:"enabled"`
+	CustomInstructions *string `json:"custom_instructions,omitempty"`
 }
 
 // PeerCardConfig represents the peer card configuration
 type PeerCardConfig struct {
-	Use    bool `json:"use,omitempty"`
-	Create bool `json:"create,omitempty"`
+	Use    *bool `json:"use"`
+	Create *bool `json:"create"`
 }
 
 // SummaryConfig represents the summary configuration
 type SummaryConfig struct {
-	Enabled                 bool `json:"enabled,omitempty"`
-	MessagesPerShortSummary int  `json:"messages_per_short_summary,omitempty"`
-	MessagesPerLongSummary  int  `json:"messages_per_long_summary,omitempty"`
+	Enabled                 *bool `json:"enabled"`
+	MessagesPerShortSummary *int  `json:"messages_per_short_summary,omitempty"`
+	MessagesPerLongSummary  *int  `json:"messages_per_long_summary,omitempty"`
 }
 
 // DreamConfig represents the dream configuration
 type DreamConfig struct {
-	Enabled bool `json:"enabled,omitempty"`
+	Enabled *bool `json:"enabled"`
 }
 
 // WorkspaceGetRequest represents the request body for getting all workspaces
