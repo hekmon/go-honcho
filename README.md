@@ -93,61 +93,18 @@ client := honcho.New(&honcho.Options{
 ```go
 // Customize HTTP client settings (timeouts, transport, etc.)
 import (
-    "net/http"
     "time"
+
+    "github.com/hashicorp/go-cleanhttp"
 )
 
-httpClient := &http.Client{
-    Timeout: 30 * time.Second,
-}
+// Start with cleanhttp.DefaultPooledClient() and modify as needed
+httpClient := cleanhttp.DefaultPooledClient()
+httpClient.Timeout = 30 * time.Second
 
 client := honcho.New(&honcho.Options{
     APIKey: "your-api-key",
     HTTP:   httpClient,
-})
-```
-
-### Environment Variables
-
-The SDK supports configuration via environment variables:
-
-```bash
-# Required: Your Honcho API key
-HONCHO_API_KEY=your-api-key-here
-
-# Optional: Custom base URL (defaults to https://api.honcho.dev)
-HONCHO_BASE_URL=https://api.honcho.dev
-
-# Optional: HTTP timeout in seconds (defaults to 30)
-HONCHO_TIMEOUT=30
-```
-
-```go
-// Load configuration from environment variables
-import (
-    "os"
-    "strconv"
-    "time"
-)
-
-apiKey := os.Getenv("HONCHO_API_KEY")
-if apiKey == "" {
-    log.Fatal("HONCHO_API_KEY environment variable is required")
-}
-
-baseURL, _ := url.Parse(os.Getenv("HONCHO_BASE_URL"))
-timeout := 30 * time.Second
-if timeoutStr := os.Getenv("HONCHO_TIMEOUT"); timeoutStr != "" {
-    if seconds, err := strconv.Atoi(timeoutStr); err == nil {
-        timeout = time.Duration(seconds) * time.Second
-    }
-}
-
-httpClient := &http.Client{Timeout: timeout}
-client := honcho.New(&honcho.Options{
-    APIKey:  apiKey,
-    BaseURL: baseURL,
-    HTTP:    httpClient,
 })
 ```
 

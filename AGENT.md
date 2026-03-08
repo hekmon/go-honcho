@@ -464,9 +464,9 @@ const (
     peerBaseURI = "/v3/workspaces"  // WRONG! Just use workspaceBaseURI
 )
 
-// ❌ Don't create constants for path extensions
+// ❌ Don't create constants for path extensions (this is workspaceBaseURI + "/peers")
 const (
-    peerBaseURI = "/v3/workspaces/peers"  // WRONG! This is workspaceBaseURI + "/peers"
+    peersBaseURI = "/v3/workspaces/peers"  // WRONG! Use workspaceBaseURI + "peers"
 )
 ```
 
