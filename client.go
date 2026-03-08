@@ -3,6 +3,8 @@ package honcho
 import (
 	"net/http"
 	"net/url"
+
+	"github.com/hashicorp/go-cleanhttp"
 )
 
 const (
@@ -21,13 +23,24 @@ func init() {
 }
 
 type Options struct {
-	BaseURL *url.URL
-	APIKey  string
+	BaseURL *url.URL     // if empty, defaults to ManagedServiceURL
+	APIKey  string       // if empty, authorization header will not be set
+	HTTP    *http.Client // if empty, defaults to cleanhttp.DefaultPooledClient()
 }
 
-func New(options Options) *Client {
-	if options.BaseURL == nil {
-		options.BaseURL = ManagedServiceURL
+func New(options *Options) *Client {
+	if options == nil {
+		options = &Options{
+			BaseURL: ManagedServiceURL,
+			HTTP:    cleanhttp.DefaultPooledClient(),
+		}
+	} else {
+		if options.BaseURL == nil {
+			options.BaseURL = ManagedServiceURL
+		}
+		if options.HTTP == nil {
+			options.HTTP = cleanhttp.DefaultPooledClient()
+		}
 	}
 	return &Client{
 		baseURL: options.BaseURL,
