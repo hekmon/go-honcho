@@ -4,16 +4,64 @@ This document provides comprehensive guidelines for implementing the Honcho Go S
 
 ## Table of Contents
 
-1. [Introduction](#introduction)
-2. [File Organization](#file-organization)
-3. [Constants & Shared Resources](#constants--shared-resources)
-4. [Documentation & API Discovery](#documentation--api-discovery)
-5. [Implementation Pattern](#implementation-pattern)
-6. [Coding Style](#coding-style)
-7. [Validation](#validation)
-8. [Low-Level Request Method](#low-level-request-method)
-9. [Implementation Verification](#implementation-verification)
-10. [Quick Reference](#quick-reference)
+1. [Quick Start](#quick-start)
+2. [Introduction](#introduction)
+3. [File Organization](#file-organization)
+4. [Constants & Shared Resources](#constants--shared-resources)
+5. [Documentation & API Discovery](#documentation--api-discovery)
+6. [Implementation Pattern](#implementation-pattern)
+7. [Coding Style](#coding-style)
+8. [Validation](#validation)
+9. [Low-Level Request Method](#low-level-request-method)
+10. [Implementation Verification](#implementation-verification)
+11. [Quick Reference](#quick-reference)
+
+---
+
+## Quick Start
+
+**For AI Agents: Follow this workflow when implementing new endpoints**
+
+1. **Read Core Principles** ([Introduction](#introduction)) - Understand type safety, error handling, validation rules
+
+2. **Review File Organization** ([File Organization](#file-organization)) - Know where types vs methods go
+
+3. **Study One Complete Example** - Read `workspace.go` + `workspace_types.go` to understand the pattern
+
+4. **When Implementing a New Endpoint:**
+   - Fetch the endpoint `.md` URL from `https://docs.honcho.dev/llms.txt`
+   - Copy the pattern from a similar existing method
+   - Define all types in `{category}_types.go`
+   - Implement methods in `{category}.go` (Client methods only)
+   - Run the [Implementation Checklist](#method-implementation-checklist)
+   - Verify with [Type Location Check](#type-location-check)
+
+5. **When Unsure → Ask Operator**
+
+### Quick Decision Trees
+
+**Does this struct need a `Validate()` method?**
+```
+Has required fields (no omitempty)?
+├─ YES → Add Validate()
+└─ NO → Has constrained optional fields (int/float with 0=default)?
+   ├─ YES → Add Validate() (allow 0, validate non-zero only)
+   └─ NO → NO Validate() method (omit entirely)
+```
+
+**Which BaseURI constant to use?**
+```
+Endpoint path starts with `/v3/workspaces`?
+├─ YES → Use `workspaceBaseURI` (from workspace.go)
+└─ NO → Create new `{category}BaseURI` constant
+```
+
+**Pointer vs Value type for optional field?**
+```
+Need to distinguish "not provided" from "zero value"?
+├─ YES → Use pointer (*int, *bool, *string) with omitempty
+└─ NO → Use value type (int, bool) with omitempty (0 = use default)
+```
 
 ---
 
@@ -271,8 +319,8 @@ func NewClientFromConfig(cfg *Config) (*honcho.Client, error) {
 
 Each API category gets its own pair of files:
 
-- `{category}.go` - Method implementations only
-- `{category}_types.go` - Type definitions only
+- `{category}.go` - Client methods only (e.g., `func (c *Client) GetWorkspace(...)`)
+- `{category}_types.go` - Type definitions only (structs can have their own methods like `Validate()`)
 
 **Example:** `workspace.go` / `workspace_types.go`, `peer.go` / `peer_types.go`
 
