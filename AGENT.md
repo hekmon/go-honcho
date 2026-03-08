@@ -254,7 +254,8 @@ Before finalizing a method, verify:
 - [ ] Block comment with 1-3 sentence description
 - [ ] API doc URL in block comment (without `.md` extension)
 - [ ] Named returns: `(result *Type, err error)`
-- [ ] Validation called if request has `Validate()` method
+- [ ] Validation called ONLY if `Validate()` method exists on the request type
+- [ ] If ALL fields are optional (no `Validate()` method), do NOT call `req.Validate()`
 - [ ] Uses `workspaceBaseURI` constant
 - [ ] Uses `c.request()` method
 - [ ] Errors wrapped with `%w`
@@ -265,7 +266,7 @@ Before finalizing a method, verify:
 
 ```go
 func (c *Client) MethodName(req RequestType) (result *ResultType, err error) {
-    // 1. Validate mandatory parameters
+    // 1. Validate mandatory parameters (ONLY if Validate() method exists)
     if err = req.Validate(); err != nil {
         return
     }
@@ -286,6 +287,8 @@ func (c *Client) MethodName(req RequestType) (result *ResultType, err error) {
     return
 }
 ```
+
+**Note:** If the request type has ONLY optional fields (no `Validate()` method), skip step 1 entirely. Do NOT call `req.Validate()` when the method doesn't exist.
 
 ### Method Signature Patterns
 
@@ -462,14 +465,31 @@ type MessageUpdate struct {
 ### Call Validation in Methods
 
 ```go
-// ✅ Call Validate() at the start of methods
+// ✅ Call Validate() at the start of methods (ONLY if Validate() method exists)
 func (c *Client) GetOrCreateWorkspace(req CreateWorkspaceRequest) (result *Workspace, err error) {
     if err = req.Validate(); err != nil {
         return
     }
     // ... rest of implementation
 }
+
+// ✅ When ALL fields are optional, do NOT call Validate() (method doesn't exist)
+func (c *Client) CreateKey(req CreateKeyRequest) (result *Key, err error) {
+    // No validation call - all fields are optional, Validate() method doesn't exist
+    requestURL := c.baseURL.JoinPath(keyBaseURI)
+    // ... rest of implementation
+}
+
+// ❌ Don't call Validate() when the method doesn't exist
+func (c *Client) CreateKey(req CreateKeyRequest) (result *Key, err error) {
+    if err = req.Validate(); err != nil {  // ERROR: Validate() method doesn't exist!
+        return
+    }
+    // ... rest of implementation
+}
 ```
+
+**Rule:** When ALL fields are optional and you omit the `Validate()` method, ensure NO method calls `req.Validate()` on that type. Check if the `Validate()` method exists before calling it.
 
 ### Validation Constraint Precision
 
@@ -778,7 +798,8 @@ grep "type.*struct" peer.go        # Should find nothing
 - ✅ Named returns used consistently
 - ✅ Naked returns used (no explicit return values)
 - ✅ Errors wrapped with context using `%w`
-- ✅ Validation called at method start (if request has Validate())
+- ✅ Validation called ONLY if `Validate()` method exists on request type
+- ✅ No calls to `req.Validate()` when all fields are optional
 - ✅ Uses `workspaceBaseURI` constant (not hardcoded URLs)
 - ✅ Uses `c.request()` method (not `http.Client.Do()`)
 - ✅ Error messages in loops use `fmt.Errorf("item %d: %w", index, err)` (not string concatenation)
@@ -792,6 +813,7 @@ grep "type.*struct" peer.go        # Should find nothing
 - ✅ Uses `any` not `interface{}`
 - ✅ Optional nested structs use pointers with `omitempty`
 - ✅ No `Validate()` method if ALL fields are optional (remove it entirely)
+- ✅ No `req.Validate()` call if `Validate()` method doesn't exist
 
 ### Completeness Check
 
@@ -826,6 +848,7 @@ grep "type.*struct" peer.go        # Should find nothing
 - ✅ Use `fmt.Errorf("item %d: %w", index, err)` for error messages in loops
 - ✅ Pass `bytes.Buffer` directly to `request()` for multipart forms
 - ✅ Omit `Validate()` method entirely if ALL fields are optional
+- ✅ Omit `req.Validate()` call when `Validate()` method doesn't exist
 
 ### DON'T:
 
@@ -843,3 +866,5 @@ grep "type.*struct" peer.go        # Should find nothing
 - ❌ Use string concatenation for error messages in loops
 - ❌ Convert multipart `bytes.Buffer` to string with `buffer.String()`
 - ❌ Add `Validate()` method when ALL fields are optional
+- ❌ Call `req.Validate()` when ALL fields are optional (method doesn't exist)
+- ❌ Leave `Validate()` calls after removing the `Validate()` method

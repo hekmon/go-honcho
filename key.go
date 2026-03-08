@@ -17,9 +17,6 @@ const (
 //
 // https://docs.honcho.dev/v3/api-reference/endpoint/keys/create-key
 func (c *Client) CreateKey(req CreateKeyRequest) (result *Key, err error) {
-	if err = req.Validate(); err != nil {
-		return
-	}
 	requestURL := c.baseURL.JoinPath(keyBaseURI)
 	query := requestURL.Query()
 	if req.WorkspaceID != "" {
@@ -41,10 +38,4 @@ func (c *Client) CreateKey(req CreateKeyRequest) (result *Key, err error) {
 		return
 	}
 	return
-}
-
-// Validate validates the CreateKeyRequest.
-func (req CreateKeyRequest) Validate() error {
-	// All fields are optional, no validation required
-	return nil
 }
