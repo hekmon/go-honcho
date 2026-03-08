@@ -54,11 +54,17 @@ func (c *Client) GetOrCreateWorkspace(req CreateWorkspaceRequest) (result *Works
 
 ### Base URI Constant
 
-**Each category file must define a constant for the base URI:**
+**All API endpoints share the same base URI `/v3/workspaces`. Use the `workspaceBaseURI` constant from `workspace.go` in all category files:**
+
+**Note:** If you encounter an endpoint that does NOT start with `/v3/workspaces`, create a new constant for that specific base path.
 
 ```go
+// ✅ In peer.go, session.go, etc. - reuse workspaceBaseURI
+requestURL := c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "peers")
+
+// ❌ Don't define a new constant per category
 const (
-    workspaceBaseURI = "/v3/workspaces"
+    peerBaseURI = "/v3/workspaces"  // redundant!
 )
 ```
 
@@ -305,16 +311,30 @@ This is critical for optional parameters where `0` means "use server default".
 ### Endpoint Paths
 
 ```go
-// ✅ Use constants for endpoint paths
-const (
-    workspaceBaseURI = "/v3/workspaces"
-)
+// ✅ Use workspaceBaseURI constant (defined in workspace.go) for all categories
+// All endpoints follow the pattern: /v3/workspaces/{workspace_id}/{category}/...
+requestURL := c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "peers")
 
-// ✅ Use baseURL.JoinPath() for clean URL construction
-requestURL := c.baseURL.JoinPath(workspaceBaseURI)
+// ✅ If an endpoint doesn't start with /v3/workspaces, define a new constant
+const specialBaseURI = "/v3/special-endpoint"
+
+// ✅ Build category-specific paths by appending to workspaceBaseURI
+const (
+    workspaceBaseURI = "/v3/workspaces"  // defined once in workspace.go
+)
 
 // ❌ Avoid hardcoding full URLs
 requestURL, err := url.Parse("https://api.honcho.dev/v3/workspaces")
+
+// ❌ Don't define redundant base URI constants per category
+const (
+    peerBaseURI = "/v3/workspaces"  // wrong! reuse workspaceBaseURI
+)
+
+// ❌ Don't create new constants unnecessarily - only for truly different base paths
+const (
+    peerBaseURI = "/v3/workspaces/peers"  // wrong! this is just a path extension
+)
 ```
 
 ---
@@ -413,7 +433,8 @@ import (
 ### DO:
 
 - ✅ Organize by category (`category.go`/`category_types.go`)
-- ✅ Define base URI constant per category (e.g., `workspaceBaseURI`)
+- ✅ Reuse `workspaceBaseURI` constant from `workspace.go` (all endpoints start with `/v3/workspaces`)
+- ✅ Create a new base URI constant only for endpoints that don't start with `/v3/workspaces`
 - ✅ Separate types (`*_types.go`) from methods (`*.go`)
 - ✅ Use named returns and naked returns
 - ✅ Validate mandatory parameters with `Validate()` methods
@@ -433,7 +454,7 @@ import (
 ### DON'T:
 
 - ❌ Mix categories in the same file
-- ❌ Omit base URI constant per category
+- ❌ Define redundant base URI constants (reuse `workspaceBaseURI` from `workspace.go`)
 - ❌ Omit `.md` documentation links for methods
 - ❌ Mix types and methods in the same file
 - ❌ Validate optional parameters (server handles those)
