@@ -78,7 +78,7 @@ func (c *Client) request(method string, requestURL *url.URL, headers http.Header
 	switch resp.StatusCode {
 	case http.StatusNoContent, http.StatusAccepted:
 		return
-	case http.StatusOK:
+	case http.StatusOK, http.StatusCreated:
 		// continue
 	case http.StatusUnprocessableEntity:
 		// Decode validation error
