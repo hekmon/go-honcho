@@ -2,6 +2,7 @@ package honcho
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"mime/multipart"
 	"net/http"
@@ -9,7 +10,7 @@ import (
 )
 
 // https://docs.honcho.dev/v3/api-reference/endpoint/messages/create-messages-for-session
-func (c *Client) CreateMessagesForSession(workspaceID, sessionID string, req MessageBatchCreate) (result []*Message, err error) {
+func (c *Client) CreateMessagesForSession(ctx context.Context, workspaceID, sessionID string, req MessageBatchCreate) (result []*Message, err error) {
 	// Validate request
 	if err = req.Validate(); err != nil {
 		return
@@ -19,7 +20,7 @@ func (c *Client) CreateMessagesForSession(workspaceID, sessionID string, req Mes
 	// Initialize result
 	result = make([]*Message, 0, len(req.Messages))
 	// Make request
-	if _, err = c.request(http.MethodPost, requestURL, nil, req, &result); err != nil {
+	if _, err = c.request(ctx, http.MethodPost, requestURL, nil, req, &result); err != nil {
 		err = fmt.Errorf("failed to create messages: %w", err)
 		return
 	}
@@ -27,7 +28,7 @@ func (c *Client) CreateMessagesForSession(workspaceID, sessionID string, req Mes
 }
 
 // https://docs.honcho.dev/v3/api-reference/endpoint/messages/create-messages-with-file
-func (c *Client) CreateMessagesWithFile(workspaceID, sessionID string, req MessageUpload) (result []*Message, err error) {
+func (c *Client) CreateMessagesWithFile(ctx context.Context, workspaceID, sessionID string, req MessageUpload) (result []*Message, err error) {
 	// Validate request
 	if err = req.Validate(); err != nil {
 		return
@@ -84,7 +85,7 @@ func (c *Client) CreateMessagesWithFile(workspaceID, sessionID string, req Messa
 	headers := make(http.Header)
 	headers.Set("Content-Type", writer.FormDataContentType())
 	// Make request with bytes.Buffer body (multipart data)
-	if _, err = c.request(http.MethodPost, requestURL, headers, bodyBuffer, &result); err != nil {
+	if _, err = c.request(ctx, http.MethodPost, requestURL, headers, bodyBuffer, &result); err != nil {
 		err = fmt.Errorf("failed to upload file and create messages: %w", err)
 		return
 	}
@@ -92,13 +93,13 @@ func (c *Client) CreateMessagesWithFile(workspaceID, sessionID string, req Messa
 }
 
 // https://docs.honcho.dev/v3/api-reference/endpoint/messages/get-message
-func (c *Client) GetMessage(workspaceID, sessionID, messageID string) (result *Message, err error) {
+func (c *Client) GetMessage(ctx context.Context, workspaceID, sessionID, messageID string) (result *Message, err error) {
 	// Construct URL
 	requestURL := c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "sessions", sessionID, "messages", messageID)
 	// Initialize result
 	result = new(Message)
 	// Make request
-	if _, err = c.request(http.MethodGet, requestURL, nil, nil, result); err != nil {
+	if _, err = c.request(ctx, http.MethodGet, requestURL, nil, nil, result); err != nil {
 		err = fmt.Errorf("failed to get message: %w", err)
 		return
 	}
@@ -106,7 +107,7 @@ func (c *Client) GetMessage(workspaceID, sessionID, messageID string) (result *M
 }
 
 // https://docs.honcho.dev/v3/api-reference/endpoint/messages/get-messages
-func (c *Client) GetMessages(workspaceID, sessionID string, req *MessageGet, options *GetMessagesOptions) (result *PageMessage, err error) {
+func (c *Client) GetMessages(ctx context.Context, workspaceID, sessionID string, req *MessageGet, options *GetMessagesOptions) (result *PageMessage, err error) {
 	// Construct URL
 	requestURL := c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "sessions", sessionID, "messages", "list")
 	// Add query parameters
@@ -126,7 +127,7 @@ func (c *Client) GetMessages(workspaceID, sessionID string, req *MessageGet, opt
 	// Initialize result
 	result = new(PageMessage)
 	// Make request
-	if _, err = c.request(http.MethodPost, requestURL, nil, req, result); err != nil {
+	if _, err = c.request(ctx, http.MethodPost, requestURL, nil, req, result); err != nil {
 		err = fmt.Errorf("failed to get messages: %w", err)
 		return
 	}
@@ -134,13 +135,13 @@ func (c *Client) GetMessages(workspaceID, sessionID string, req *MessageGet, opt
 }
 
 // https://docs.honcho.dev/v3/api-reference/endpoint/messages/update-message
-func (c *Client) UpdateMessage(workspaceID, sessionID, messageID string, req MessageUpdate) (result *Message, err error) {
+func (c *Client) UpdateMessage(ctx context.Context, workspaceID, sessionID, messageID string, req MessageUpdate) (result *Message, err error) {
 	// Construct URL
 	requestURL := c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "sessions", sessionID, "messages", messageID)
 	// Initialize result
 	result = new(Message)
 	// Make request
-	if _, err = c.request(http.MethodPut, requestURL, nil, req, result); err != nil {
+	if _, err = c.request(ctx, http.MethodPut, requestURL, nil, req, result); err != nil {
 		err = fmt.Errorf("failed to update message: %w", err)
 		return
 	}

@@ -1,6 +1,7 @@
 package honcho
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -13,7 +14,7 @@ import (
 // Otherwise, it uses the peer_id from the JWT.
 //
 // https://docs.honcho.dev/v3/api-reference/endpoint/peers/get-or-create-peer
-func (c *Client) GetOrCreatePeer(workspaceID string, req PeerCreate) (result *Peer, err error) {
+func (c *Client) GetOrCreatePeer(ctx context.Context, workspaceID string, req PeerCreate) (result *Peer, err error) {
 	if workspaceID == "" {
 		err = errors.New("workspaceID is required")
 		return
@@ -23,7 +24,7 @@ func (c *Client) GetOrCreatePeer(workspaceID string, req PeerCreate) (result *Pe
 	}
 	result = new(Peer)
 	if _, err = c.request(
-		http.MethodPost, c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "peers"), nil,
+		ctx, http.MethodPost, c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "peers"), nil,
 		req, &result,
 	); err != nil {
 		err = fmt.Errorf("failed to execute request: %w", err)
@@ -35,7 +36,7 @@ func (c *Client) GetOrCreatePeer(workspaceID string, req PeerCreate) (result *Pe
 // GetAllPeers gets all Peers for a Workspace, paginated with optional filters.
 //
 // https://docs.honcho.dev/v3/api-reference/endpoint/peers/get-peers
-func (c *Client) GetAllPeers(workspaceID string, req *PeerGet, opts *GetAllPeersOptions) (result *PagePeer, err error) {
+func (c *Client) GetAllPeers(ctx context.Context, workspaceID string, req *PeerGet, opts *GetAllPeersOptions) (result *PagePeer, err error) {
 	if workspaceID == "" {
 		err = errors.New("workspaceID is required")
 		return
@@ -53,7 +54,7 @@ func (c *Client) GetAllPeers(workspaceID string, req *PeerGet, opts *GetAllPeers
 	}
 	result = new(PagePeer)
 	if _, err = c.request(
-		http.MethodPost, requestURL, nil,
+		ctx, http.MethodPost, requestURL, nil,
 		req, &result,
 	); err != nil {
 		err = fmt.Errorf("failed to execute request: %w", err)
@@ -65,7 +66,7 @@ func (c *Client) GetAllPeers(workspaceID string, req *PeerGet, opts *GetAllPeers
 // UpdatePeer updates a Peer's metadata and/or configuration.
 //
 // https://docs.honcho.dev/v3/api-reference/endpoint/peers/update-peer
-func (c *Client) UpdatePeer(workspaceID, peerID string, req PeerUpdate) (result *Peer, err error) {
+func (c *Client) UpdatePeer(ctx context.Context, workspaceID, peerID string, req PeerUpdate) (result *Peer, err error) {
 	if workspaceID == "" {
 		err = errors.New("workspaceID is required")
 		return
@@ -76,7 +77,7 @@ func (c *Client) UpdatePeer(workspaceID, peerID string, req PeerUpdate) (result 
 	}
 	result = new(Peer)
 	if _, err = c.request(
-		http.MethodPut, c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "peers", peerID), nil,
+		ctx, http.MethodPut, c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "peers", peerID), nil,
 		req, &result,
 	); err != nil {
 		err = fmt.Errorf("failed to execute request: %w", err)
@@ -95,7 +96,7 @@ func (c *Client) UpdatePeer(workspaceID, peerID string, req PeerUpdate) (result 
 // If no target is provided, we get the omniscient Honcho Representation of the Peer.
 //
 // https://docs.honcho.dev/v3/api-reference/endpoint/peers/get-representation
-func (c *Client) GetRepresentation(workspaceID, peerID string, req PeerRepresentationGet) (result *RepresentationResponse, err error) {
+func (c *Client) GetRepresentation(ctx context.Context, workspaceID, peerID string, req PeerRepresentationGet) (result *RepresentationResponse, err error) {
 	if workspaceID == "" {
 		err = errors.New("workspaceID is required")
 		return
@@ -106,7 +107,7 @@ func (c *Client) GetRepresentation(workspaceID, peerID string, req PeerRepresent
 	}
 	result = new(RepresentationResponse)
 	if _, err = c.request(
-		http.MethodPost, c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "peers", peerID, "representation"), nil,
+		ctx, http.MethodPost, c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "peers", peerID, "representation"), nil,
 		req, &result,
 	); err != nil {
 		err = fmt.Errorf("failed to execute request: %w", err)
@@ -121,7 +122,7 @@ func (c *Client) GetRepresentation(workspaceID, peerID string, req PeerRepresent
 // If no target is specified, returns the observer's own peer card.
 //
 // https://docs.honcho.dev/v3/api-reference/endpoint/peers/get-peer-card
-func (c *Client) GetPeerCard(workspaceID, peerID string, target *string) (result *PeerCardResponse, err error) {
+func (c *Client) GetPeerCard(ctx context.Context, workspaceID, peerID string, target *string) (result *PeerCardResponse, err error) {
 	if workspaceID == "" {
 		err = errors.New("workspaceID is required")
 		return
@@ -138,7 +139,7 @@ func (c *Client) GetPeerCard(workspaceID, peerID string, target *string) (result
 	}
 	result = new(PeerCardResponse)
 	if _, err = c.request(
-		http.MethodGet, requestURL, nil,
+		ctx, http.MethodGet, requestURL, nil,
 		nil, &result,
 	); err != nil {
 		err = fmt.Errorf("failed to execute request: %w", err)
@@ -153,7 +154,7 @@ func (c *Client) GetPeerCard(workspaceID, peerID string, target *string) (result
 // If no target is specified, sets the observer's own peer card.
 //
 // https://docs.honcho.dev/v3/api-reference/endpoint/peers/set-peer-card
-func (c *Client) SetPeerCard(workspaceID, peerID string, req PeerCardSet, target *string) (result *PeerCardResponse, err error) {
+func (c *Client) SetPeerCard(ctx context.Context, workspaceID, peerID string, req PeerCardSet, target *string) (result *PeerCardResponse, err error) {
 	if workspaceID == "" {
 		err = errors.New("workspaceID is required")
 		return
@@ -173,7 +174,7 @@ func (c *Client) SetPeerCard(workspaceID, peerID string, req PeerCardSet, target
 	}
 	result = new(PeerCardResponse)
 	if _, err = c.request(
-		http.MethodPut, requestURL, nil,
+		ctx, http.MethodPut, requestURL, nil,
 		req, &result,
 	); err != nil {
 		err = fmt.Errorf("failed to execute request: %w", err)
@@ -191,7 +192,7 @@ func (c *Client) SetPeerCard(workspaceID, peerID string, req PeerCardSet, target
 // This is useful for getting all the context needed about a peer without making multiple API calls.
 //
 // https://docs.honcho.dev/v3/api-reference/endpoint/peers/get-peer-context
-func (c *Client) GetPeerContext(workspaceID, peerID string, opts *GetPeerContextOptions) (result *PeerContext, err error) {
+func (c *Client) GetPeerContext(ctx context.Context, workspaceID, peerID string, opts *GetPeerContextOptions) (result *PeerContext, err error) {
 	if workspaceID == "" {
 		err = errors.New("workspaceID is required")
 		return
@@ -225,7 +226,7 @@ func (c *Client) GetPeerContext(workspaceID, peerID string, opts *GetPeerContext
 	requestURL.RawQuery = query.Encode()
 	result = new(PeerContext)
 	if _, err = c.request(
-		http.MethodGet, requestURL, nil,
+		ctx, http.MethodGet, requestURL, nil,
 		nil, &result,
 	); err != nil {
 		err = fmt.Errorf("failed to execute request: %w", err)
@@ -237,7 +238,7 @@ func (c *Client) GetPeerContext(workspaceID, peerID string, opts *GetPeerContext
 // GetSessionsForPeer gets all Sessions for a Peer, paginated with optional filters.
 //
 // https://docs.honcho.dev/v3/api-reference/endpoint/peers/get-sessions-for-peer
-func (c *Client) GetSessionsForPeer(workspaceID, peerID string, req *SessionGet, opts *GetSessionsForPeerOptions) (result *PageSession, err error) {
+func (c *Client) GetSessionsForPeer(ctx context.Context, workspaceID, peerID string, req *SessionGet, opts *GetSessionsForPeerOptions) (result *PageSession, err error) {
 	if workspaceID == "" {
 		err = errors.New("workspaceID is required")
 		return
@@ -259,7 +260,7 @@ func (c *Client) GetSessionsForPeer(workspaceID, peerID string, req *SessionGet,
 	}
 	result = new(PageSession)
 	if _, err = c.request(
-		http.MethodPost, requestURL, nil,
+		ctx, http.MethodPost, requestURL, nil,
 		req, &result,
 	); err != nil {
 		err = fmt.Errorf("failed to execute request: %w", err)
@@ -271,7 +272,7 @@ func (c *Client) GetSessionsForPeer(workspaceID, peerID string, req *SessionGet,
 // SearchPeer searches a Peer's messages, optionally filtered by various criteria.
 //
 // https://docs.honcho.dev/v3/api-reference/endpoint/peers/search-peer
-func (c *Client) SearchPeer(workspaceID, peerID string, req MessageSearchOptions) (result *[]Message, err error) {
+func (c *Client) SearchPeer(ctx context.Context, workspaceID, peerID string, req MessageSearchOptions) (result *[]Message, err error) {
 	if workspaceID == "" {
 		err = errors.New("workspaceID is required")
 		return
@@ -285,7 +286,7 @@ func (c *Client) SearchPeer(workspaceID, peerID string, req MessageSearchOptions
 	}
 	result = new([]Message)
 	if _, err = c.request(
-		http.MethodPost, c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "peers", peerID, "search"), nil,
+		ctx, http.MethodPost, c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "peers", peerID, "search"), nil,
 		req, &result,
 	); err != nil {
 		err = fmt.Errorf("failed to execute request: %w", err)
@@ -300,7 +301,7 @@ func (c *Client) SearchPeer(workspaceID, peerID string, req MessageSearchOptions
 // all latent knowledge gathered about the peer from their messages and conclusions.
 //
 // https://docs.honcho.dev/v3/api-reference/endpoint/peers/chat
-func (c *Client) Chat(workspaceID, peerID string, req DialecticOptions) (result *DialecticResponse, err error) {
+func (c *Client) Chat(ctx context.Context, workspaceID, peerID string, req DialecticOptions) (result *DialecticResponse, err error) {
 	if workspaceID == "" {
 		err = errors.New("workspaceID is required")
 		return
@@ -314,7 +315,7 @@ func (c *Client) Chat(workspaceID, peerID string, req DialecticOptions) (result 
 	}
 	result = new(DialecticResponse)
 	if _, err = c.request(
-		http.MethodPost, c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "peers", peerID, "chat"), nil,
+		ctx, http.MethodPost, c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "peers", peerID, "chat"), nil,
 		req, &result,
 	); err != nil {
 		err = fmt.Errorf("failed to execute request: %w", err)

@@ -2,6 +2,7 @@ package honcho
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,7 +12,7 @@ import (
 	"strings"
 )
 
-func (c *Client) request(method string, requestURL *url.URL, headers http.Header, body, result any) (responseHeaders http.Header, err error) {
+func (c *Client) request(ctx context.Context, method string, requestURL *url.URL, headers http.Header, body, result any) (responseHeaders http.Header, err error) {
 	// Build request
 	var (
 		bodyReader io.Reader
@@ -45,7 +46,7 @@ func (c *Client) request(method string, requestURL *url.URL, headers http.Header
 	if bodyReader == nil {
 		bodyReader = &bodyBuffer
 	}
-	req, err := http.NewRequest(method, requestURL.String(), bodyReader)
+	req, err := http.NewRequestWithContext(ctx, method, requestURL.String(), bodyReader)
 	if err != nil {
 		err = fmt.Errorf("failed to build request: %s", err)
 		return
@@ -82,6 +83,13 @@ func (c *Client) request(method string, requestURL *url.URL, headers http.Header
 		// continue
 	case http.StatusUnprocessableEntity:
 		// Decode validation error
+		var data []byte
+		data, err = io.ReadAll(resp.Body)
+		if err != nil {
+			err = fmt.Errorf("failed to read response body: %w", err)
+			return
+		}
+		fmt.Println(string(data))
 		var valErr HTTPValidationError
 		if err = json.NewDecoder(resp.Body).Decode(&valErr); err != nil {
 			err = fmt.Errorf("failed to decode validation error: %w", err)
@@ -112,7 +120,14 @@ func (c *Client) request(method string, requestURL *url.URL, headers http.Header
 	}
 	// Decode result body
 	if strings.HasPrefix(resp.Header.Get("Content-Type"), "application/json") {
-		if err = json.NewDecoder(resp.Body).Decode(result); err != nil {
+		var data []byte
+		data, err = io.ReadAll(resp.Body)
+		if err != nil {
+			err = fmt.Errorf("failed to read response body: %w", err)
+			return
+		}
+		//fmt.Println(string(data))
+		if err = json.Unmarshal(data, result); err != nil {
 			err = fmt.Errorf("failed to decode response: %s", err)
 			return
 		}

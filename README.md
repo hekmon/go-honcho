@@ -28,6 +28,7 @@ go get github.com/hekmon/go-honcho
 package main
 
 import (
+    "context"
     "fmt"
     "log"
 
@@ -42,7 +43,7 @@ func main() {
     })
 
     // Get or create a workspace
-    workspace, err := client.GetOrCreateWorkspace(honcho.CreateWorkspaceRequest{
+    workspace, err := client.GetOrCreateWorkspace(context.Background(), honcho.CreateWorkspaceRequest{
         ID: "my-workspace",
     })
     if err != nil {
@@ -636,6 +637,7 @@ sessions, err := client.GetSessions("workspace-id", nil, &honcho.GetSessionsOpti
 | `bool` | Pagination/filters (false = default) | `Reverse bool` |
 | `*string` | Optional text where empty string is meaningful | `Target *string` |
 | `*time.Time` | Optional timestamps | `ExpiresAt *time.Time` |
+
 
 ## Best Practices
 

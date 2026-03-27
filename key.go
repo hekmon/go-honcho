@@ -1,6 +1,7 @@
 package honcho
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"time"
@@ -16,7 +17,7 @@ const (
 // An optional expiration time can also be set.
 //
 // https://docs.honcho.dev/v3/api-reference/endpoint/keys/create-key
-func (c *Client) CreateKey(req CreateKeyRequest) (result *Key, err error) {
+func (c *Client) CreateKey(ctx context.Context, req CreateKeyRequest) (result *Key, err error) {
 	requestURL := c.baseURL.JoinPath(keyBaseURI)
 	query := requestURL.Query()
 	if req.WorkspaceID != "" {
@@ -33,7 +34,7 @@ func (c *Client) CreateKey(req CreateKeyRequest) (result *Key, err error) {
 	}
 	requestURL.RawQuery = query.Encode()
 	result = new(Key)
-	if _, err = c.request(http.MethodPost, requestURL, nil, nil, result); err != nil {
+	if _, err = c.request(ctx, http.MethodPost, requestURL, nil, nil, result); err != nil {
 		err = fmt.Errorf("failed to create key: %w", err)
 		return
 	}

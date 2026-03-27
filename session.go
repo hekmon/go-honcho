@@ -1,6 +1,7 @@
 package honcho
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -13,7 +14,7 @@ import (
 // Otherwise, it uses the session_id from the JWT for verification.
 //
 // https://docs.honcho.dev/v3/api-reference/endpoint/sessions/get-or-create-session
-func (c *Client) GetOrCreateSession(workspaceID string, req SessionCreate) (result *Session, err error) {
+func (c *Client) GetOrCreateSession(ctx context.Context, workspaceID string, req SessionCreate) (result *Session, err error) {
 	if workspaceID == "" {
 		err = errors.New("workspaceID is required")
 		return
@@ -23,7 +24,7 @@ func (c *Client) GetOrCreateSession(workspaceID string, req SessionCreate) (resu
 	}
 	result = new(Session)
 	if _, err = c.request(
-		http.MethodPost, c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "sessions"), nil,
+		ctx, http.MethodPost, c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "sessions"), nil,
 		req, &result,
 	); err != nil {
 		err = fmt.Errorf("failed to execute request: %w", err)
@@ -35,7 +36,7 @@ func (c *Client) GetOrCreateSession(workspaceID string, req SessionCreate) (resu
 // GetSessions gets all Sessions for a Workspace, paginated with optional filters.
 //
 // https://docs.honcho.dev/v3/api-reference/endpoint/sessions/get-sessions
-func (c *Client) GetSessions(workspaceID string, req *SessionGet, opts *GetSessionsOptions) (result *PageSession, err error) {
+func (c *Client) GetSessions(ctx context.Context, workspaceID string, req *SessionGet, opts *GetSessionsOptions) (result *PageSession, err error) {
 	if workspaceID == "" {
 		err = errors.New("workspaceID is required")
 		return
@@ -53,7 +54,7 @@ func (c *Client) GetSessions(workspaceID string, req *SessionGet, opts *GetSessi
 	}
 	result = new(PageSession)
 	if _, err = c.request(
-		http.MethodPost, requestURL, nil,
+		ctx, http.MethodPost, requestURL, nil,
 		req, &result,
 	); err != nil {
 		err = fmt.Errorf("failed to execute request: %w", err)
@@ -65,7 +66,7 @@ func (c *Client) GetSessions(workspaceID string, req *SessionGet, opts *GetSessi
 // UpdateSession updates a Session's metadata and/or configuration.
 //
 // https://docs.honcho.dev/v3/api-reference/endpoint/sessions/update-session
-func (c *Client) UpdateSession(workspaceID, sessionID string, req SessionUpdate) (result *Session, err error) {
+func (c *Client) UpdateSession(ctx context.Context, workspaceID, sessionID string, req SessionUpdate) (result *Session, err error) {
 	if workspaceID == "" {
 		err = errors.New("workspaceID is required")
 		return
@@ -76,7 +77,7 @@ func (c *Client) UpdateSession(workspaceID, sessionID string, req SessionUpdate)
 	}
 	result = new(Session)
 	if _, err = c.request(
-		http.MethodPut, c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "sessions", sessionID), nil,
+		ctx, http.MethodPut, c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "sessions", sessionID), nil,
 		req, &result,
 	); err != nil {
 		err = fmt.Errorf("failed to execute request: %w", err)
@@ -93,7 +94,7 @@ func (c *Client) UpdateSession(workspaceID, sessionID string, req SessionUpdate)
 // This action cannot be undone.
 //
 // https://docs.honcho.dev/v3/api-reference/endpoint/sessions/delete-session
-func (c *Client) DeleteSession(workspaceID, sessionID string) (err error) {
+func (c *Client) DeleteSession(ctx context.Context, workspaceID, sessionID string) (err error) {
 	if workspaceID == "" {
 		err = errors.New("workspaceID is required")
 		return
@@ -103,7 +104,7 @@ func (c *Client) DeleteSession(workspaceID, sessionID string) (err error) {
 		return
 	}
 	if _, err = c.request(
-		http.MethodDelete, c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "sessions", sessionID), nil,
+		ctx, http.MethodDelete, c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "sessions", sessionID), nil,
 		nil, nil,
 	); err != nil {
 		err = fmt.Errorf("failed to execute request: %w", err)
@@ -115,7 +116,7 @@ func (c *Client) DeleteSession(workspaceID, sessionID string) (err error) {
 // CloneSession clones a Session, optionally up to a specific message ID.
 //
 // https://docs.honcho.dev/v3/api-reference/endpoint/sessions/clone-session
-func (c *Client) CloneSession(workspaceID, sessionID string, opts *CloneSessionOptions) (result *Session, err error) {
+func (c *Client) CloneSession(ctx context.Context, workspaceID, sessionID string, opts *CloneSessionOptions) (result *Session, err error) {
 	if workspaceID == "" {
 		err = errors.New("workspaceID is required")
 		return
@@ -132,7 +133,7 @@ func (c *Client) CloneSession(workspaceID, sessionID string, opts *CloneSessionO
 	}
 	result = new(Session)
 	if _, err = c.request(
-		http.MethodPost, requestURL, nil,
+		ctx, http.MethodPost, requestURL, nil,
 		nil, &result,
 	); err != nil {
 		err = fmt.Errorf("failed to execute request: %w", err)
@@ -144,7 +145,7 @@ func (c *Client) CloneSession(workspaceID, sessionID string, opts *CloneSessionO
 // GetSessionPeers gets all Peers in a Session. Results are paginated.
 //
 // https://docs.honcho.dev/v3/api-reference/endpoint/sessions/get-session-peers
-func (c *Client) GetSessionPeers(workspaceID, sessionID string, opts *GetSessionPeersOptions) (result *PagePeer, err error) {
+func (c *Client) GetSessionPeers(ctx context.Context, workspaceID, sessionID string, opts *GetSessionPeersOptions) (result *PagePeer, err error) {
 	if workspaceID == "" {
 		err = errors.New("workspaceID is required")
 		return
@@ -166,7 +167,7 @@ func (c *Client) GetSessionPeers(workspaceID, sessionID string, opts *GetSession
 	}
 	result = new(PagePeer)
 	if _, err = c.request(
-		http.MethodGet, requestURL, nil,
+		ctx, http.MethodGet, requestURL, nil,
 		nil, &result,
 	); err != nil {
 		err = fmt.Errorf("failed to execute request: %w", err)
@@ -180,7 +181,7 @@ func (c *Client) GetSessionPeers(workspaceID, sessionID string, opts *GetSession
 // This will fully replace the current set of Peers in the Session.
 //
 // https://docs.honcho.dev/v3/api-reference/endpoint/sessions/set-session-peers
-func (c *Client) SetSessionPeers(workspaceID, sessionID string, peers map[string]*SessionPeerConfig) (result *Session, err error) {
+func (c *Client) SetSessionPeers(ctx context.Context, workspaceID, sessionID string, peers map[string]*SessionPeerConfig) (result *Session, err error) {
 	if workspaceID == "" {
 		err = errors.New("workspaceID is required")
 		return
@@ -191,7 +192,7 @@ func (c *Client) SetSessionPeers(workspaceID, sessionID string, peers map[string
 	}
 	result = new(Session)
 	if _, err = c.request(
-		http.MethodPut, c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "sessions", sessionID, "peers"), nil,
+		ctx, http.MethodPut, c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "sessions", sessionID, "peers"), nil,
 		peers, &result,
 	); err != nil {
 		err = fmt.Errorf("failed to execute request: %w", err)
@@ -203,7 +204,7 @@ func (c *Client) SetSessionPeers(workspaceID, sessionID string, peers map[string
 // AddPeersToSession adds Peers to a Session. If a Peer does not yet exist, it will be created automatically.
 //
 // https://docs.honcho.dev/v3/api-reference/endpoint/sessions/add-peers-to-session
-func (c *Client) AddPeersToSession(workspaceID, sessionID string, peers map[string]*SessionPeerConfig) (result *Session, err error) {
+func (c *Client) AddPeersToSession(ctx context.Context, workspaceID, sessionID string, peers map[string]*SessionPeerConfig) (result *Session, err error) {
 	if workspaceID == "" {
 		err = errors.New("workspaceID is required")
 		return
@@ -214,7 +215,7 @@ func (c *Client) AddPeersToSession(workspaceID, sessionID string, peers map[stri
 	}
 	result = new(Session)
 	if _, err = c.request(
-		http.MethodPost, c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "sessions", sessionID, "peers"), nil,
+		ctx, http.MethodPost, c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "sessions", sessionID, "peers"), nil,
 		peers, &result,
 	); err != nil {
 		err = fmt.Errorf("failed to execute request: %w", err)
@@ -226,7 +227,7 @@ func (c *Client) AddPeersToSession(workspaceID, sessionID string, peers map[stri
 // RemovePeersFromSession removes Peers by ID from a Session.
 //
 // https://docs.honcho.dev/v3/api-reference/endpoint/sessions/remove-peers-from-session
-func (c *Client) RemovePeersFromSession(workspaceID, sessionID string, peerIDs []string) (result *Session, err error) {
+func (c *Client) RemovePeersFromSession(ctx context.Context, workspaceID, sessionID string, peerIDs []string) (result *Session, err error) {
 	if workspaceID == "" {
 		err = errors.New("workspaceID is required")
 		return
@@ -241,7 +242,7 @@ func (c *Client) RemovePeersFromSession(workspaceID, sessionID string, peerIDs [
 	}
 	result = new(Session)
 	if _, err = c.request(
-		http.MethodDelete, c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "sessions", sessionID, "peers"), nil,
+		ctx, http.MethodDelete, c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "sessions", sessionID, "peers"), nil,
 		peerIDs, &result,
 	); err != nil {
 		err = fmt.Errorf("failed to execute request: %w", err)
@@ -258,7 +259,7 @@ func (c *Client) RemovePeersFromSession(workspaceID, sessionID string, peerIDs [
 // we allocate all the tokens to recent messages.
 //
 // https://docs.honcho.dev/v3/api-reference/endpoint/sessions/get-session-context
-func (c *Client) GetSessionContext(workspaceID, sessionID string, opts *GetSessionContextOptions) (result *SessionContext, err error) {
+func (c *Client) GetSessionContext(ctx context.Context, workspaceID, sessionID string, opts *GetSessionContextOptions) (result *SessionContext, err error) {
 	if workspaceID == "" {
 		err = errors.New("workspaceID is required")
 		return
@@ -304,7 +305,7 @@ func (c *Client) GetSessionContext(workspaceID, sessionID string, opts *GetSessi
 	}
 	result = new(SessionContext)
 	if _, err = c.request(
-		http.MethodGet, requestURL, nil,
+		ctx, http.MethodGet, requestURL, nil,
 		nil, &result,
 	); err != nil {
 		err = fmt.Errorf("failed to execute request: %w", err)
@@ -319,7 +320,7 @@ func (c *Client) GetSessionContext(workspaceID, sessionID string, opts *GetSessi
 // the message ID they cover up to, creation timestamp, and token count.
 //
 // https://docs.honcho.dev/v3/api-reference/endpoint/sessions/get-session-summaries
-func (c *Client) GetSessionSummaries(workspaceID, sessionID string) (result *SessionSummaries, err error) {
+func (c *Client) GetSessionSummaries(ctx context.Context, workspaceID, sessionID string) (result *SessionSummaries, err error) {
 	if workspaceID == "" {
 		err = errors.New("workspaceID is required")
 		return
@@ -330,7 +331,7 @@ func (c *Client) GetSessionSummaries(workspaceID, sessionID string) (result *Ses
 	}
 	result = new(SessionSummaries)
 	if _, err = c.request(
-		http.MethodGet, c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "sessions", sessionID, "summaries"), nil,
+		ctx, http.MethodGet, c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "sessions", sessionID, "summaries"), nil,
 		nil, &result,
 	); err != nil {
 		err = fmt.Errorf("failed to execute request: %w", err)
@@ -344,7 +345,7 @@ func (c *Client) GetSessionSummaries(workspaceID, sessionID string) (result *Ses
 // Use limit to control the number of results returned.
 //
 // https://docs.honcho.dev/v3/api-reference/endpoint/sessions/search-session
-func (c *Client) SearchSession(workspaceID, sessionID string, req MessageSearchOptions) (result *[]Message, err error) {
+func (c *Client) SearchSession(ctx context.Context, workspaceID, sessionID string, req MessageSearchOptions) (result *[]Message, err error) {
 	if workspaceID == "" {
 		err = errors.New("workspaceID is required")
 		return
@@ -358,7 +359,7 @@ func (c *Client) SearchSession(workspaceID, sessionID string, req MessageSearchO
 	}
 	result = new([]Message)
 	if _, err = c.request(
-		http.MethodPost, c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "sessions", sessionID, "search"), nil,
+		ctx, http.MethodPost, c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "sessions", sessionID, "search"), nil,
 		req, &result,
 	); err != nil {
 		err = fmt.Errorf("failed to execute request: %w", err)
@@ -370,7 +371,7 @@ func (c *Client) SearchSession(workspaceID, sessionID string, req MessageSearchO
 // GetPeerConfig gets the configuration for a Peer in a Session.
 //
 // https://docs.honcho.dev/v3/api-reference/endpoint/sessions/get-peer-config
-func (c *Client) GetPeerConfig(workspaceID, sessionID, peerID string) (result *SessionPeerConfig, err error) {
+func (c *Client) GetPeerConfig(ctx context.Context, workspaceID, sessionID, peerID string) (result *SessionPeerConfig, err error) {
 	if workspaceID == "" {
 		err = errors.New("workspaceID is required")
 		return
@@ -385,7 +386,7 @@ func (c *Client) GetPeerConfig(workspaceID, sessionID, peerID string) (result *S
 	}
 	result = new(SessionPeerConfig)
 	if _, err = c.request(
-		http.MethodGet, c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "sessions", sessionID, "peers", peerID, "config"), nil,
+		ctx, http.MethodGet, c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "sessions", sessionID, "peers", peerID, "config"), nil,
 		nil, &result,
 	); err != nil {
 		err = fmt.Errorf("failed to execute request: %w", err)
@@ -397,7 +398,7 @@ func (c *Client) GetPeerConfig(workspaceID, sessionID, peerID string) (result *S
 // SetPeerConfig sets the configuration for a Peer in a Session.
 //
 // https://docs.honcho.dev/v3/api-reference/endpoint/sessions/set-peer-config
-func (c *Client) SetPeerConfig(workspaceID, sessionID, peerID string, config SessionPeerConfig) (err error) {
+func (c *Client) SetPeerConfig(ctx context.Context, workspaceID, sessionID, peerID string, config SessionPeerConfig) (err error) {
 	if workspaceID == "" {
 		err = errors.New("workspaceID is required")
 		return
@@ -411,7 +412,7 @@ func (c *Client) SetPeerConfig(workspaceID, sessionID, peerID string, config Ses
 		return
 	}
 	if _, err = c.request(
-		http.MethodPut, c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "sessions", sessionID, "peers", peerID, "config"), nil,
+		ctx, http.MethodPut, c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "sessions", sessionID, "peers", peerID, "config"), nil,
 		config, nil,
 	); err != nil {
 		err = fmt.Errorf("failed to execute request: %w", err)

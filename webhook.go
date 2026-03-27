@@ -1,6 +1,7 @@
 package honcho
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -9,7 +10,7 @@ import (
 // GetOrCreateWebhookEndpoint gets or creates a webhook endpoint URL.
 //
 // https://docs.honcho.dev/v3/api-reference/endpoint/webhooks/get-or-create-webhook-endpoint
-func (c *Client) GetOrCreateWebhookEndpoint(workspaceID string, req WebhookEndpointCreate) (result *WebhookEndpoint, err error) {
+func (c *Client) GetOrCreateWebhookEndpoint(ctx context.Context, workspaceID string, req WebhookEndpointCreate) (result *WebhookEndpoint, err error) {
 	// Validate request
 	if err = req.Validate(); err != nil {
 		return
@@ -19,7 +20,7 @@ func (c *Client) GetOrCreateWebhookEndpoint(workspaceID string, req WebhookEndpo
 	// Initialize result
 	result = new(WebhookEndpoint)
 	// Make request
-	if _, err = c.request(http.MethodPost, requestURL, nil, req, result); err != nil {
+	if _, err = c.request(ctx, http.MethodPost, requestURL, nil, req, result); err != nil {
 		err = fmt.Errorf("failed to get or create webhook endpoint: %w", err)
 		return
 	}
@@ -31,7 +32,7 @@ func (c *Client) GetOrCreateWebhookEndpoint(workspaceID string, req WebhookEndpo
 // Results are paginated. Use opts to control pagination.
 //
 // https://docs.honcho.dev/v3/api-reference/endpoint/webhooks/list-webhook-endpoints
-func (c *Client) ListWebhookEndpoints(workspaceID string, opts *ListWebhookEndpointsOptions) (result *PageWebhookEndpoint, err error) {
+func (c *Client) ListWebhookEndpoints(ctx context.Context, workspaceID string, opts *ListWebhookEndpointsOptions) (result *PageWebhookEndpoint, err error) {
 	// Validate options
 	if opts != nil {
 		if err = opts.Validate(); err != nil {
@@ -43,7 +44,7 @@ func (c *Client) ListWebhookEndpoints(workspaceID string, opts *ListWebhookEndpo
 	// Initialize result
 	result = new(PageWebhookEndpoint)
 	// Make request
-	if _, err = c.request(http.MethodGet, requestURL, nil, opts, result); err != nil {
+	if _, err = c.request(ctx, http.MethodGet, requestURL, nil, opts, result); err != nil {
 		err = fmt.Errorf("failed to list webhook endpoints: %w", err)
 		return
 	}
@@ -55,7 +56,7 @@ func (c *Client) ListWebhookEndpoints(workspaceID string, opts *ListWebhookEndpo
 // This action cannot be undone.
 //
 // https://docs.honcho.dev/v3/api-reference/endpoint/webhooks/delete-webhook-endpoint
-func (c *Client) DeleteWebhookEndpoint(workspaceID, endpointID string) (err error) {
+func (c *Client) DeleteWebhookEndpoint(ctx context.Context, workspaceID, endpointID string) (err error) {
 	// Validate required parameters
 	if workspaceID == "" {
 		err = errors.New("workspace_id is required")
@@ -68,7 +69,7 @@ func (c *Client) DeleteWebhookEndpoint(workspaceID, endpointID string) (err erro
 	// Construct URL
 	requestURL := c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "webhooks", endpointID)
 	// Make request (204 No Content expected)
-	if _, err = c.request(http.MethodDelete, requestURL, nil, nil, nil); err != nil {
+	if _, err = c.request(ctx, http.MethodDelete, requestURL, nil, nil, nil); err != nil {
 		err = fmt.Errorf("failed to delete webhook endpoint: %w", err)
 		return
 	}
@@ -80,7 +81,7 @@ func (c *Client) DeleteWebhookEndpoint(workspaceID, endpointID string) (err erro
 // This endpoint triggers a test webhook event to verify the endpoint is configured correctly.
 //
 // https://docs.honcho.dev/v3/api-reference/endpoint/webhooks/test-emit
-func (c *Client) TestEmit(workspaceID string) (err error) {
+func (c *Client) TestEmit(ctx context.Context, workspaceID string) (err error) {
 	// Validate required parameters
 	if workspaceID == "" {
 		err = errors.New("workspace_id is required")
@@ -89,7 +90,7 @@ func (c *Client) TestEmit(workspaceID string) (err error) {
 	// Construct URL
 	requestURL := c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "webhooks", "test")
 	// Make request
-	if _, err = c.request(http.MethodGet, requestURL, nil, nil, nil); err != nil {
+	if _, err = c.request(ctx, http.MethodGet, requestURL, nil, nil, nil); err != nil {
 		err = fmt.Errorf("failed to test webhook emit: %w", err)
 		return
 	}

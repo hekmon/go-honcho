@@ -1,6 +1,7 @@
 package honcho
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -13,7 +14,7 @@ import (
 // They form the basis of a Peer's Representation.
 //
 // https://docs.honcho.dev/v3/api-reference/endpoint/conclusions/create-conclusions
-func (c *Client) CreateConclusions(workspaceID string, req ConclusionBatchCreate) (result []*Conclusion, err error) {
+func (c *Client) CreateConclusions(ctx context.Context, workspaceID string, req ConclusionBatchCreate) (result []*Conclusion, err error) {
 	if workspaceID == "" {
 		err = errors.New("workspaceID is required")
 		return
@@ -23,7 +24,7 @@ func (c *Client) CreateConclusions(workspaceID string, req ConclusionBatchCreate
 	}
 	requestURL := c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "conclusions")
 	result = make([]*Conclusion, 0, len(req.Conclusions))
-	if _, err = c.request(http.MethodPost, requestURL, nil, req, &result); err != nil {
+	if _, err = c.request(ctx, http.MethodPost, requestURL, nil, req, &result); err != nil {
 		err = fmt.Errorf("failed to create conclusions: %w", err)
 		return
 	}
@@ -35,7 +36,7 @@ func (c *Client) CreateConclusions(workspaceID string, req ConclusionBatchCreate
 // This action cannot be undone.
 //
 // https://docs.honcho.dev/v3/api-reference/endpoint/conclusions/delete-conclusion
-func (c *Client) DeleteConclusion(workspaceID, conclusionID string) (err error) {
+func (c *Client) DeleteConclusion(ctx context.Context, workspaceID, conclusionID string) (err error) {
 	if workspaceID == "" {
 		err = errors.New("workspaceID is required")
 		return
@@ -45,7 +46,7 @@ func (c *Client) DeleteConclusion(workspaceID, conclusionID string) (err error) 
 		return
 	}
 	requestURL := c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "conclusions", conclusionID)
-	if _, err = c.request(http.MethodDelete, requestURL, nil, nil, nil); err != nil {
+	if _, err = c.request(ctx, http.MethodDelete, requestURL, nil, nil, nil); err != nil {
 		err = fmt.Errorf("failed to delete conclusion: %w", err)
 		return
 	}
@@ -57,7 +58,7 @@ func (c *Client) DeleteConclusion(workspaceID, conclusionID string) (err error) 
 // Results are paginated.
 //
 // https://docs.honcho.dev/v3/api-reference/endpoint/conclusions/list-conclusions
-func (c *Client) ListConclusions(workspaceID string, req *ConclusionGet, opts *ListConclusionsOptions) (result *PageConclusion, err error) {
+func (c *Client) ListConclusions(ctx context.Context, workspaceID string, req *ConclusionGet, opts *ListConclusionsOptions) (result *PageConclusion, err error) {
 	if workspaceID == "" {
 		err = errors.New("workspaceID is required")
 		return
@@ -77,7 +78,7 @@ func (c *Client) ListConclusions(workspaceID string, req *ConclusionGet, opts *L
 	}
 	requestURL.RawQuery = query.Encode()
 	result = new(PageConclusion)
-	if _, err = c.request(http.MethodPost, requestURL, nil, req, result); err != nil {
+	if _, err = c.request(ctx, http.MethodPost, requestURL, nil, req, result); err != nil {
 		err = fmt.Errorf("failed to list conclusions: %w", err)
 		return
 	}
@@ -89,7 +90,7 @@ func (c *Client) ListConclusions(workspaceID string, req *ConclusionGet, opts *L
 // Use `top_k` to control the number of results returned.
 //
 // https://docs.honcho.dev/v3/api-reference/endpoint/conclusions/query-conclusions
-func (c *Client) QueryConclusions(workspaceID string, req ConclusionQuery) (result []*Conclusion, err error) {
+func (c *Client) QueryConclusions(ctx context.Context, workspaceID string, req ConclusionQuery) (result []*Conclusion, err error) {
 	if workspaceID == "" {
 		err = errors.New("workspaceID is required")
 		return
@@ -99,7 +100,7 @@ func (c *Client) QueryConclusions(workspaceID string, req ConclusionQuery) (resu
 	}
 	requestURL := c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "conclusions", "query")
 	result = make([]*Conclusion, 0, req.TopK)
-	if _, err = c.request(http.MethodPost, requestURL, nil, req, &result); err != nil {
+	if _, err = c.request(ctx, http.MethodPost, requestURL, nil, req, &result); err != nil {
 		err = fmt.Errorf("failed to query conclusions: %w", err)
 		return
 	}

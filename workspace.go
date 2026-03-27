@@ -1,6 +1,7 @@
 package honcho
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -17,13 +18,13 @@ const (
 // it will be returned. If it doesn't exist, it will be created with that ID.
 //
 // https://docs.honcho.dev/v3/api-reference/endpoint/workspaces/get-or-create-workspace
-func (c *Client) GetOrCreateWorkspace(req CreateWorkspaceRequest) (result *Workspace, err error) {
+func (c *Client) GetOrCreateWorkspace(ctx context.Context, req CreateWorkspaceRequest) (result *Workspace, err error) {
 	if err = req.Validate(); err != nil {
 		return
 	}
 	result = new(Workspace)
 	if _, err = c.request(
-		http.MethodPost, c.baseURL.JoinPath(workspaceBaseURI), nil,
+		ctx, http.MethodPost, c.baseURL.JoinPath(workspaceBaseURI), nil,
 		req, &result,
 	); err != nil {
 		err = fmt.Errorf("failed to execute request: %w", err)
@@ -35,7 +36,7 @@ func (c *Client) GetOrCreateWorkspace(req CreateWorkspaceRequest) (result *Works
 // GetAllWorkspaces gets all Workspaces, paginated with optional filters.
 //
 // https://docs.honcho.dev/v3/api-reference/endpoint/workspaces/get-all-workspaces
-func (c *Client) GetAllWorkspaces(req WorkspaceGetRequest, opts *GetAllWorkspacesOptions) (result *PageWorkspace, err error) {
+func (c *Client) GetAllWorkspaces(ctx context.Context, req WorkspaceGetRequest, opts *GetAllWorkspacesOptions) (result *PageWorkspace, err error) {
 	requestURL := c.baseURL.JoinPath(workspaceBaseURI, "list")
 	if opts != nil {
 		query := requestURL.Query()
@@ -49,7 +50,7 @@ func (c *Client) GetAllWorkspaces(req WorkspaceGetRequest, opts *GetAllWorkspace
 	}
 	result = new(PageWorkspace)
 	if _, err = c.request(
-		http.MethodPost, requestURL, nil,
+		ctx, http.MethodPost, requestURL, nil,
 		req, &result,
 	); err != nil {
 		err = fmt.Errorf("failed to execute request: %w", err)
@@ -61,14 +62,14 @@ func (c *Client) GetAllWorkspaces(req WorkspaceGetRequest, opts *GetAllWorkspace
 // UpdateWorkspace updates a Workspace's metadata and/or configuration.
 //
 // https://docs.honcho.dev/v3/api-reference/endpoint/workspaces/update-workspace
-func (c *Client) UpdateWorkspace(workspaceID string, req UpdateWorkspaceRequest) (result *Workspace, err error) {
+func (c *Client) UpdateWorkspace(ctx context.Context, workspaceID string, req UpdateWorkspaceRequest) (result *Workspace, err error) {
 	if workspaceID == "" {
 		err = errors.New("workspaceID is required")
 		return
 	}
 	result = new(Workspace)
 	if _, err = c.request(
-		http.MethodPut, c.baseURL.JoinPath(workspaceBaseURI, workspaceID), nil,
+		ctx, http.MethodPut, c.baseURL.JoinPath(workspaceBaseURI, workspaceID), nil,
 		req, &result,
 	); err != nil {
 		err = fmt.Errorf("failed to execute request: %w", err)
@@ -84,13 +85,13 @@ func (c *Client) UpdateWorkspace(workspaceID string, req UpdateWorkspaceRequest)
 // This action cannot be undone.
 //
 // https://docs.honcho.dev/v3/api-reference/endpoint/workspaces/delete-workspace
-func (c *Client) DeleteWorkspace(workspaceID string) (err error) {
+func (c *Client) DeleteWorkspace(ctx context.Context, workspaceID string) (err error) {
 	if workspaceID == "" {
 		err = errors.New("workspaceID is required")
 		return
 	}
 	if _, err = c.request(
-		http.MethodDelete, c.baseURL.JoinPath(workspaceBaseURI, workspaceID), nil,
+		ctx, http.MethodDelete, c.baseURL.JoinPath(workspaceBaseURI, workspaceID), nil,
 		nil, nil,
 	); err != nil {
 		err = fmt.Errorf("failed to execute request: %w", err)
@@ -106,7 +107,7 @@ func (c *Client) DeleteWorkspace(workspaceID string) (err error) {
 // periodic queue cleanup, not lifetime totals.
 //
 // https://docs.honcho.dev/v3/api-reference/endpoint/workspaces/get-queue-status
-func (c *Client) GetQueueStatus(workspaceID string, observerID, senderID, sessionID *string) (result *QueueStatus, err error) {
+func (c *Client) GetQueueStatus(ctx context.Context, workspaceID string, observerID, senderID, sessionID *string) (result *QueueStatus, err error) {
 	if workspaceID == "" {
 		err = errors.New("workspaceID is required")
 		return
@@ -125,7 +126,7 @@ func (c *Client) GetQueueStatus(workspaceID string, observerID, senderID, sessio
 	requestURL.RawQuery = query.Encode()
 	result = new(QueueStatus)
 	if _, err = c.request(
-		http.MethodGet, requestURL, nil,
+		ctx, http.MethodGet, requestURL, nil,
 		nil, &result,
 	); err != nil {
 		err = fmt.Errorf("failed to execute request: %w", err)
@@ -141,7 +142,7 @@ func (c *Client) GetQueueStatus(workspaceID string, observerID, senderID, sessio
 // immediate dreams.
 //
 // https://docs.honcho.dev/v3/api-reference/endpoint/workspaces/schedule-dream
-func (c *Client) ScheduleDream(workspaceID string, req ScheduleDreamRequest) (err error) {
+func (c *Client) ScheduleDream(ctx context.Context, workspaceID string, req ScheduleDreamRequest) (err error) {
 	if workspaceID == "" {
 		err = errors.New("workspaceID is required")
 		return
@@ -150,7 +151,7 @@ func (c *Client) ScheduleDream(workspaceID string, req ScheduleDreamRequest) (er
 		return
 	}
 	if _, err = c.request(
-		http.MethodPost, c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "schedule_dream"), nil,
+		ctx, http.MethodPost, c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "schedule_dream"), nil,
 		req, nil,
 	); err != nil {
 		err = fmt.Errorf("failed to execute request: %w", err)
@@ -162,7 +163,7 @@ func (c *Client) ScheduleDream(workspaceID string, req ScheduleDreamRequest) (er
 // SearchWorkspace searches messages in a Workspace using optional filters.
 //
 // https://docs.honcho.dev/v3/api-reference/endpoint/workspaces/search-workspace
-func (c *Client) SearchWorkspace(workspaceID string, req MessageSearchOptions) (result *[]Message, err error) {
+func (c *Client) SearchWorkspace(ctx context.Context, workspaceID string, req MessageSearchOptions) (result *[]Message, err error) {
 	if workspaceID == "" {
 		err = errors.New("workspaceID is required")
 		return
@@ -172,7 +173,7 @@ func (c *Client) SearchWorkspace(workspaceID string, req MessageSearchOptions) (
 	}
 	result = new([]Message)
 	if _, err = c.request(
-		http.MethodPost, c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "search"), nil,
+		ctx, http.MethodPost, c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "search"), nil,
 		req, &result,
 	); err != nil {
 		err = fmt.Errorf("failed to execute request: %w", err)
