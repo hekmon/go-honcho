@@ -1,6 +1,7 @@
 package honcho
 
 import (
+	"encoding/json"
 	"errors"
 	"regexp"
 )
@@ -13,7 +14,7 @@ type SessionCreate struct {
 	// ID is the session identifier (required, 1-100 characters, pattern: ^[a-zA-Z0-9_-]+$)
 	ID string `json:"id"`
 	// Metadata is optional metadata for the session
-	Metadata map[string]any `json:"metadata,omitempty"`
+	Metadata json.RawMessage `json:"metadata,omitempty"`
 	// Peers is optional map of peer IDs to their session-level configuration
 	Peers map[string]*SessionPeerConfig `json:"peers,omitempty"`
 	// Configuration is optional session-level configuration
@@ -37,7 +38,7 @@ func (req SessionCreate) Validate() error {
 // SessionUpdate represents the request body for updating a session
 type SessionUpdate struct {
 	// Metadata is optional metadata to update
-	Metadata map[string]any `json:"metadata,omitempty"`
+	Metadata json.RawMessage `json:"metadata,omitempty"`
 	// Configuration is optional configuration to update
 	Configuration *SessionConfiguration `json:"configuration,omitempty"`
 }

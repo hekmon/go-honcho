@@ -1,6 +1,7 @@
 package honcho
 
 import (
+	"encoding/json"
 	"errors"
 	"regexp"
 	"time"
@@ -9,7 +10,7 @@ import (
 // CreateWorkspaceRequest represents the request body for creating/getting a workspace
 type CreateWorkspaceRequest struct {
 	ID            string                  `json:"id"`
-	Metadata      map[string]any          `json:"metadata,omitempty"`
+	Metadata      json.RawMessage         `json:"metadata,omitempty"`
 	Configuration *WorkspaceConfiguration `json:"configuration,omitempty"`
 }
 
@@ -34,7 +35,7 @@ func (req CreateWorkspaceRequest) Validate() error {
 type Workspace struct {
 	ID            string                  `json:"id"`
 	CreatedAt     time.Time               `json:"created_at"`
-	Metadata      map[string]any          `json:"metadata,omitempty"`
+	Metadata      json.RawMessage         `json:"metadata,omitempty"`
 	Configuration *WorkspaceConfiguration `json:"configuration,omitempty"`
 }
 
@@ -77,7 +78,7 @@ type WorkspaceGetRequest struct {
 
 // UpdateWorkspaceRequest represents the request body for updating a workspace
 type UpdateWorkspaceRequest struct {
-	Metadata      map[string]any          `json:"metadata,omitempty"`
+	Metadata      json.RawMessage         `json:"metadata,omitempty"`
 	Configuration *WorkspaceConfiguration `json:"configuration,omitempty"`
 }
 

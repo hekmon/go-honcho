@@ -1,6 +1,7 @@
 package honcho
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -17,7 +18,7 @@ type Message struct {
 	// SessionID is the ID of the session the message belongs to
 	SessionID string `json:"session_id"`
 	// Metadata is optional metadata for the message
-	Metadata map[string]any `json:"metadata,omitempty"`
+	Metadata json.RawMessage `json:"metadata,omitempty"`
 	// CreatedAt is the timestamp when the message was created
 	CreatedAt time.Time `json:"created_at"`
 	// WorkspaceID is the ID of the workspace the message belongs to
@@ -33,7 +34,7 @@ type MessageCreate struct {
 	// PeerID is the ID of the peer sending the message (required)
 	PeerID string `json:"peer_id"`
 	// Metadata is optional metadata for the message
-	Metadata map[string]any `json:"metadata,omitempty"`
+	Metadata json.RawMessage `json:"metadata,omitempty"`
 	// Configuration is optional message-level configuration
 	Configuration *MessageConfiguration `json:"configuration,omitempty"`
 	// CreatedAt is optional timestamp for the message
@@ -86,7 +87,7 @@ type MessageGet struct {
 // MessageUpdate represents the request body for updating a message
 type MessageUpdate struct {
 	// Metadata is optional metadata to update (will overwrite existing metadata)
-	Metadata map[string]any `json:"metadata,omitempty"`
+	Metadata json.RawMessage `json:"metadata,omitempty"`
 }
 
 // MessageConfiguration represents the configuration options for a message

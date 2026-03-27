@@ -1,6 +1,7 @@
 package honcho
 
 import (
+	"encoding/json"
 	"errors"
 	"regexp"
 	"time"
@@ -11,18 +12,18 @@ var peerIDPattern = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 
 // Peer represents a Honcho peer
 type Peer struct {
-	ID            string         `json:"id"`
-	WorkspaceID   string         `json:"workspace_id"`
-	CreatedAt     time.Time      `json:"created_at"`
-	Metadata      map[string]any `json:"metadata,omitempty"`
-	Configuration map[string]any `json:"configuration,omitempty"`
+	ID            string          `json:"id"`
+	WorkspaceID   string          `json:"workspace_id"`
+	CreatedAt     time.Time       `json:"created_at"`
+	Metadata      json.RawMessage `json:"metadata,omitempty"`
+	Configuration json.RawMessage `json:"configuration,omitempty"`
 }
 
 // PeerCreate represents the request body for creating/getting a peer
 type PeerCreate struct {
-	ID            string         `json:"id"`
-	Metadata      map[string]any `json:"metadata,omitempty"`
-	Configuration map[string]any `json:"configuration,omitempty"`
+	ID            string          `json:"id"`
+	Metadata      json.RawMessage `json:"metadata,omitempty"`
+	Configuration json.RawMessage `json:"configuration,omitempty"`
 }
 
 // Validate checks that mandatory fields are valid
@@ -56,8 +57,8 @@ type PagePeer struct {
 
 // PeerUpdate represents the request body for updating a peer
 type PeerUpdate struct {
-	Metadata      map[string]any `json:"metadata,omitempty"`
-	Configuration map[string]any `json:"configuration,omitempty"`
+	Metadata      json.RawMessage `json:"metadata,omitempty"`
+	Configuration json.RawMessage `json:"configuration,omitempty"`
 }
 
 // PeerRepresentationGet represents the request body for getting a peer's representation
@@ -111,12 +112,12 @@ type PeerContext struct {
 
 // Session represents a Honcho session
 type Session struct {
-	ID            string         `json:"id"`
-	IsActive      bool           `json:"is_active"`
-	WorkspaceID   string         `json:"workspace_id"`
-	Metadata      map[string]any `json:"metadata,omitempty"`
-	Configuration map[string]any `json:"configuration,omitempty"`
-	CreatedAt     time.Time      `json:"created_at"`
+	ID            string          `json:"id"`
+	IsActive      bool            `json:"is_active"`
+	WorkspaceID   string          `json:"workspace_id"`
+	Metadata      json.RawMessage `json:"metadata,omitempty"`
+	Configuration json.RawMessage `json:"configuration,omitempty"`
+	CreatedAt     time.Time       `json:"created_at"`
 }
 
 // GetAllPeersOptions represents optional parameters for GetAllPeers
