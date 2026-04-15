@@ -345,7 +345,7 @@ func (c *Client) GetSessionSummaries(ctx context.Context, workspaceID, sessionID
 // Use limit to control the number of results returned.
 //
 // https://docs.honcho.dev/v3/api-reference/endpoint/sessions/search-session
-func (c *Client) SearchSession(ctx context.Context, workspaceID, sessionID string, req MessageSearchOptions) (result *[]Message, err error) {
+func (c *Client) SearchSession(ctx context.Context, workspaceID, sessionID string, req MessageSearchOptions) (result []Message, err error) {
 	if workspaceID == "" {
 		err = errors.New("workspaceID is required")
 		return
@@ -357,7 +357,6 @@ func (c *Client) SearchSession(ctx context.Context, workspaceID, sessionID strin
 	if err = req.Validate(); err != nil {
 		return
 	}
-	result = new([]Message)
 	if _, err = c.request(
 		ctx, http.MethodPost, c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "sessions", sessionID, "search"), nil,
 		req, &result,

@@ -16,14 +16,22 @@ type Peer struct {
 	WorkspaceID   string          `json:"workspace_id"`
 	CreatedAt     time.Time       `json:"created_at"`
 	Metadata      json.RawMessage `json:"metadata,omitempty"`
-	Configuration json.RawMessage `json:"configuration,omitempty"`
+	Configuration PeerConfig      `json:"configuration,omitzero"`
+}
+
+// PeerConfig represents the workspace-level configuration for a peer
+type PeerConfig struct {
+	// ObserveMe indicates whether Honcho will use reasoning to form a representation of this peer
+	ObserveMe *bool `json:"observe_me"`
+	// ObserveOthers indicates whether this peer should form a session-level theory-of-mind representation of other peers
+	ObserveOthers *bool `json:"observe_others"`
 }
 
 // PeerCreate represents the request body for creating/getting a peer
 type PeerCreate struct {
 	ID            string          `json:"id"`
 	Metadata      json.RawMessage `json:"metadata,omitempty"`
-	Configuration json.RawMessage `json:"configuration,omitempty"`
+	Configuration PeerConfig      `json:"configuration,omitzero"`
 }
 
 // Validate checks that mandatory fields are valid
@@ -58,7 +66,7 @@ type PagePeer struct {
 // PeerUpdate represents the request body for updating a peer
 type PeerUpdate struct {
 	Metadata      json.RawMessage `json:"metadata,omitempty"`
-	Configuration json.RawMessage `json:"configuration,omitempty"`
+	Configuration PeerConfig      `json:"configuration,omitzero"`
 }
 
 // PeerRepresentationGet represents the request body for getting a peer's representation
@@ -116,7 +124,7 @@ type Session struct {
 	IsActive      bool            `json:"is_active"`
 	WorkspaceID   string          `json:"workspace_id"`
 	Metadata      json.RawMessage `json:"metadata,omitempty"`
-	Configuration json.RawMessage `json:"configuration,omitempty"`
+	Configuration PeerConfig      `json:"configuration,omitzero"`
 	CreatedAt     time.Time       `json:"created_at"`
 }
 
