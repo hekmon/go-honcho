@@ -12,6 +12,14 @@ import (
 	"strings"
 )
 
+// streamHandler is a result that reads the response body as it arrives: request
+// asks for an event stream and calls the handler once the status is handled,
+// returning its error. As request drains the body afterwards, a handler leaving
+// a stream the server may keep open must end the request's context first. Its
+// connection is not reused: a server failing a stream closes it after answering,
+// and the transport does not retry a POST sent on a connection being closed.
+type streamHandler func(io.Reader) error
+
 func (c *Client) request(ctx context.Context, method string, requestURL *url.URL, headers http.Header, body, result any) (responseHeaders http.Header, err error) {
 	// Build request
 	var (
@@ -58,6 +66,9 @@ func (c *Client) request(ctx context.Context, method string, requestURL *url.URL
 	switch result.(type) {
 	case nil, *bytes.Buffer:
 		// do not set a particular accept
+	case streamHandler:
+		req.Header.Set("Accept", "text/event-stream")
+		req.Close = true
 	default:
 		req.Header.Set("Accept", "application/json")
 	}
@@ -115,6 +126,11 @@ func (c *Client) request(ctx context.Context, method string, requestURL *url.URL
 		return
 	}
 	if result == nil {
+		return
+	}
+	// Hand a stream over to its handler
+	if handler, ok := result.(streamHandler); ok {
+		err = handler(resp.Body)
 		return
 	}
 	// Decode result body

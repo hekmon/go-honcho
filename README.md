@@ -227,6 +227,16 @@ messages, err := client.SearchPeer("workspace-id", "user-123", honcho.MessageSea
 response, err := client.Chat("workspace-id", "user-123", honcho.DialecticOptions{
     Query: "What does this peer prefer?",
 })
+
+// Stream the answer as it is generated
+for chunk, err := range client.ChatStream(ctx, "workspace-id", "user-123", honcho.DialecticOptions{
+    Query: "What does this peer prefer?",
+}) {
+    if err != nil {
+        log.Fatal(err)
+    }
+    fmt.Print(chunk)
+}
 ```
 
 ### Session Operations

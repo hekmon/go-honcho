@@ -1293,7 +1293,7 @@ func (c *Client) request(method string, requestURL *url.URL, headers http.Header
 - `requestURL`: Full URL constructed with `JoinPath()`
 - `headers`: Optional HTTP headers (nil for most cases)
 - `body`: Request body (string, url.Values, struct/map, or io.Reader for multipart)
-- `result`: Pointer to result struct, `*bytes.Buffer` for raw response, or nil for no response
+- `result`: Pointer to result struct, `*bytes.Buffer` for raw response, `streamHandler` for an event stream, or nil for no response
 
 **Returns:**
 - `responseHeaders`: HTTP response headers (for advanced use cases)
@@ -1405,6 +1405,9 @@ result := new(bytes.Buffer)
 
 // ✅ JSON decoding (default)
 result := new(MyStruct)
+
+// ✅ Event stream: the handler reads the body once the status is handled
+result := streamHandler(func(body io.Reader) error { return nil })
 ```
 
 ### Extending request()

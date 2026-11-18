@@ -1,9 +1,12 @@
 package honcho
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"iter"
 	"net/http"
 	"strconv"
 )
@@ -300,6 +303,9 @@ func (c *Client) SearchPeer(ctx context.Context, workspaceID, peerID string, req
 // Performs agentic search and reasoning to comprehensively answer the query based on
 // all latent knowledge gathered about the peer from their messages and conclusions.
 //
+// Chat reads the whole answer at once and refuses a request with Stream set: use
+// ChatStream to read the answer as it is generated.
+//
 // https://docs.honcho.dev/v3/api-reference/endpoint/peers/chat
 func (c *Client) Chat(ctx context.Context, workspaceID, peerID string, req DialecticOptions) (result *DialecticResponse, err error) {
 	if workspaceID == "" {
@@ -308,6 +314,10 @@ func (c *Client) Chat(ctx context.Context, workspaceID, peerID string, req Diale
 	}
 	if peerID == "" {
 		err = errors.New("peerID is required")
+		return
+	}
+	if req.Stream {
+		err = errors.New("stream is not supported by Chat: use ChatStream instead")
 		return
 	}
 	if err = req.Validate(); err != nil {
@@ -322,4 +332,82 @@ func (c *Client) Chat(ctx context.Context, workspaceID, peerID string, req Diale
 		return
 	}
 	return
+}
+
+// ChatStream queries a Peer's representation using natural language, as Chat does,
+// and returns the answer chunk by chunk, as the server generates it.
+//
+// The request is sent when the returned iterator is ranged over. Any failure yields a
+// single error and ends the iteration, and that includes a stream the server ends
+// before finishing the answer: an iteration that ends without an error has read the
+// whole answer. Breaking out of the loop cancels the request.
+//
+//	for chunk, err := range client.ChatStream(ctx, workspaceID, peerID, req) {
+//		if err != nil {
+//			return err
+//		}
+//		fmt.Print(chunk)
+//	}
+//
+// https://docs.honcho.dev/v3/api-reference/endpoint/peers/chat
+func (c *Client) ChatStream(ctx context.Context, workspaceID, peerID string, req DialecticOptions) iter.Seq2[string, error] {
+	req.Stream = true
+	return func(yield func(string, error) bool) {
+		if workspaceID == "" {
+			yield("", errors.New("workspaceID is required"))
+			return
+		}
+		if peerID == "" {
+			yield("", errors.New("peerID is required"))
+			return
+		}
+		if err := req.Validate(); err != nil {
+			yield("", err)
+			return
+		}
+		ctx, cancel := context.WithCancel(ctx)
+		defer cancel()
+		var stopped, done bool
+		handler := streamHandler(func(body io.Reader) error {
+			// Client.request drains the body once this returns, which would last as
+			// long as the server keeps the stream open: whatever ends the handler,
+			// a panic in the caller's loop included, ends the request first.
+			defer cancel()
+			reader := bufio.NewReader(body)
+			for {
+				line, readErr := reader.ReadBytes('\n')
+				if readErr != nil && readErr != io.EOF {
+					return fmt.Errorf("failed to read stream: %w", readErr)
+				}
+				var frame dialecticStreamFrame
+				if err := frame.decodeLine(line); err != nil {
+					return err
+				}
+				if frame.Delta.Content != "" && !yield(frame.Delta.Content, nil) {
+					stopped = true
+					return nil
+				}
+				if frame.Done {
+					done = true
+					return nil
+				}
+				if readErr == io.EOF {
+					return nil
+				}
+			}
+		})
+		_, err := c.request(
+			ctx, http.MethodPost, c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "peers", peerID, "chat"), nil,
+			req, handler,
+		)
+		switch {
+		case stopped:
+			// The caller left the loop: yield must not be called again.
+		case err != nil:
+			yield("", fmt.Errorf("failed to execute request: %w", err))
+		case !done:
+			// This also covers a 202 or a 204, whose body Client.request does not read.
+			yield("", errors.New("stream ended before its final frame: the answer is incomplete"))
+		}
+	}
 }

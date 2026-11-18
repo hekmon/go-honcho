@@ -1,8 +1,10 @@
 package honcho
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"regexp"
 	"time"
 	"unicode/utf8"
@@ -179,7 +181,7 @@ type DialecticOptions struct {
 	Target *string `json:"target,omitempty"`
 	// Query is the dialectic API prompt (1-10000 characters)
 	Query string `json:"query"`
-	// Stream is whether to stream the response (default: false)
+	// Stream is whether to stream the response (default: false). ChatStream sets it and Chat refuses it
 	Stream bool `json:"stream,omitempty"`
 	// ReasoningLevel is the level of reasoning to apply (default: low)
 	ReasoningLevel ReasoningLevel `json:"reasoning_level,omitempty"`
@@ -199,4 +201,33 @@ func (req DialecticOptions) Validate() error {
 // DialecticResponse represents the response for chatting with a peer's representation
 type DialecticResponse struct {
 	Content *string `json:"content"`
+}
+
+// dialecticStreamFrame represents a frame of the event stream ChatStream reads
+type dialecticStreamFrame struct {
+	// Delta holds the next chunk of the answer, if the frame has one
+	Delta struct {
+		// Content is the text of the chunk
+		Content string `json:"content"`
+	} `json:"delta"`
+	// Done is whether this is the final frame of a complete answer
+	Done bool `json:"done"`
+}
+
+// decodeLine decodes a line of the event stream into the frame. A blank line, or
+// a line that is not a data field, leaves the frame empty.
+func (frame *dialecticStreamFrame) decodeLine(line []byte) (err error) {
+	data, isData := bytes.CutPrefix(line, []byte("data:"))
+	if data = bytes.TrimSpace(data); !isData || len(data) == 0 {
+		return
+	}
+	// json.Unmarshal would take a null for an empty frame
+	if data[0] != '{' {
+		err = errors.New("failed to decode stream frame: not a JSON object")
+		return
+	}
+	if err = json.Unmarshal(data, frame); err != nil {
+		err = fmt.Errorf("failed to decode stream frame: %w", err)
+	}
+	return
 }
