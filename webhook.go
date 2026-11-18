@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 )
 
 // GetOrCreateWebhookEndpoint gets or creates a webhook endpoint URL.
@@ -41,10 +42,21 @@ func (c *Client) ListWebhookEndpoints(ctx context.Context, workspaceID string, o
 	}
 	// Construct URL
 	requestURL := c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "webhooks")
+	// Add query parameters
+	if opts != nil {
+		query := requestURL.Query()
+		if opts.Page > 0 {
+			query.Set("page", strconv.Itoa(opts.Page))
+		}
+		if opts.Size > 0 {
+			query.Set("size", strconv.Itoa(opts.Size))
+		}
+		requestURL.RawQuery = query.Encode()
+	}
 	// Initialize result
 	result = new(PageWebhookEndpoint)
 	// Make request
-	if _, err = c.request(ctx, http.MethodGet, requestURL, nil, opts, result); err != nil {
+	if _, err = c.request(ctx, http.MethodGet, requestURL, nil, nil, result); err != nil {
 		err = fmt.Errorf("failed to list webhook endpoints: %w", err)
 		return
 	}
