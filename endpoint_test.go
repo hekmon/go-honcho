@@ -126,6 +126,9 @@ func TestMethodsRefuseUnsafeIDs(t *testing.T) {
 		webhook     = WebhookEndpointCreate{URL: "https://example.test/webhook"}
 		dream       = ScheduleDreamRequest{Observer: "alice", DreamType: DreamTypeOmni}
 		chatOptions = WorkspaceChatOptions{Query: "query"}
+		scope       = ScopeCreate{ID: "team"}
+		scopeAdd    = ScopeSessionsAdd{SessionIDs: []string{"session"}}
+		scopeRemove = ScopeSessionsRemove{SessionIDs: []string{"session"}}
 	)
 	// chatStream ranges over a ChatStream to its end and returns the one error it
 	// must yield before stopping.
@@ -167,6 +170,32 @@ func TestMethodsRefuseUnsafeIDs(t *testing.T) {
 		{"ListDreams/workspaceID", func(id string) error { return errorOf(client.ListDreams(ctx, id, nil, nil)) }},
 		{"GetDream/workspaceID", func(id string) error { return errorOf(client.GetDream(ctx, id, "run")) }},
 		{"GetDream/runID", func(id string) error { return errorOf(client.GetDream(ctx, "workspace", id)) }},
+
+		{"GetOrCreateScope/workspaceID", func(id string) error { return errorOf(client.GetOrCreateScope(ctx, id, scope)) }},
+		{"GetScopes/workspaceID", func(id string) error { return errorOf(client.GetScopes(ctx, id, nil, nil)) }},
+		{"GetScope/workspaceID", func(id string) error { return errorOf(client.GetScope(ctx, id, "team")) }},
+		{"GetScope/scopeID", func(id string) error { return errorOf(client.GetScope(ctx, "workspace", id)) }},
+		{"GetScopeStatus/workspaceID", func(id string) error { return errorOf(client.GetScopeStatus(ctx, id, "team")) }},
+		{"GetScopeStatus/scopeID", func(id string) error { return errorOf(client.GetScopeStatus(ctx, "workspace", id)) }},
+		{"AddSessionsToScope/workspaceID", func(id string) error { return client.AddSessionsToScope(ctx, id, "team", scopeAdd) }},
+		{"AddSessionsToScope/scopeID", func(id string) error { return client.AddSessionsToScope(ctx, "workspace", id, scopeAdd) }},
+		{"GetScopeSessions/workspaceID", func(id string) error { return errorOf(client.GetScopeSessions(ctx, id, "team", nil)) }},
+		{"GetScopeSessions/scopeID", func(id string) error { return errorOf(client.GetScopeSessions(ctx, "workspace", id, nil)) }},
+		{"RemoveSessionsFromScope/workspaceID", func(id string) error {
+			return client.RemoveSessionsFromScope(ctx, id, "team", scopeRemove)
+		}},
+		{"RemoveSessionsFromScope/scopeID", func(id string) error {
+			return client.RemoveSessionsFromScope(ctx, "workspace", id, scopeRemove)
+		}},
+		{"RemoveSessionFromScope/workspaceID", func(id string) error {
+			return client.RemoveSessionFromScope(ctx, id, "team", "session")
+		}},
+		{"RemoveSessionFromScope/scopeID", func(id string) error {
+			return client.RemoveSessionFromScope(ctx, "workspace", id, "session")
+		}},
+		{"RemoveSessionFromScope/sessionID", func(id string) error {
+			return client.RemoveSessionFromScope(ctx, "workspace", "team", id)
+		}},
 
 		{"CreateMessagesForSession/workspaceID", func(id string) error {
 			return errorOf(client.CreateMessagesForSession(ctx, id, "session", messages))

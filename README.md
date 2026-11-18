@@ -126,6 +126,7 @@ The SDK is organized by API categories. Each category has its own methods and ty
 | **Message** | Send and retrieve messages | `message.go`, `message_types.go` |
 | **Conclusion** | Manage conclusions (derived insights) | `conclusion.go`, `conclusion_types.go` |
 | **Dream** | Review what each dream changed in a representation | `dream.go`, `dream_types.go` |
+| **Scope** | Group sessions into visibility boundaries on recall | `scope.go`, `scope_types.go` |
 | **Webhook** | Configure webhook endpoints | `webhook.go`, `webhook_types.go` |
 | **Key** | Manage API keys | `key.go`, `key_types.go` |
 
@@ -471,6 +472,58 @@ page, err = client.ListDreams(ctx, "workspace-id", &honcho.DreamRunList{
 
 // Get one run with every change it committed
 dream, err := client.GetDream(ctx, "workspace-id", "run-id")
+```
+
+### Scope Operations
+
+```go
+// Get or create a scope (ID: 1 to 506 characters)
+// On an existing scope, metadata that differs overwrites what is stored: leave it nil to keep it
+scope, err := client.GetOrCreateScope(ctx, "workspace-id", honcho.ScopeCreate{
+    ID:       "team",
+    Metadata: json.RawMessage(`{"owner":"alice"}`),
+})
+
+// List scopes with their member session counts (paginated) - pass nil for req when no filters needed
+page, err := client.GetScopes(ctx, "workspace-id", nil, &honcho.GetScopesOptions{
+    Page:                1,
+    Size:                20,
+    IncludeSessionCount: true,
+})
+
+// List the scopes whose name contains a text
+page, err = client.GetScopes(ctx, "workspace-id", &honcho.ScopeGet{
+    Filters: map[string]any{"id": map[string]any{"icontains": "sup"}},
+}, nil)
+
+// Get a scope without creating it
+scope, err = client.GetScope(ctx, "workspace-id", "team")
+
+// Add 1 to 100 existing sessions: those with messages start an asynchronous backfill
+err = client.AddSessionsToScope(ctx, "workspace-id", "team", honcho.ScopeSessionsAdd{
+    SessionIDs: []string{"session-1", "session-2"},
+})
+
+// Track the backfills, by session
+status, err := client.GetScopeStatus(ctx, "workspace-id", "team")
+for sessionID, backfill := range status.BackfillStatus {
+    fmt.Println(sessionID, backfill.State)
+}
+
+// List the member sessions (paginated)
+sessions, err := client.GetScopeSessions(ctx, "workspace-id", "team", &honcho.GetScopeSessionsOptions{
+    Page:    1,
+    Size:    20,
+    Reverse: true, // Most recently added first
+})
+
+// Remove 1 to 100 sessions: if any does not exist, none is removed
+err = client.RemoveSessionsFromScope(ctx, "workspace-id", "team", honcho.ScopeSessionsRemove{
+    SessionIDs: []string{"session-1", "session-2"},
+})
+
+// Remove one session
+err = client.RemoveSessionFromScope(ctx, "workspace-id", "team", "session-1")
 ```
 
 ### Webhook Operations
@@ -827,6 +880,7 @@ For complete API documentation, visit:
 - **Messages**: https://docs.honcho.dev/v3/api-reference/endpoint/messages
 - **Conclusions**: https://docs.honcho.dev/v3/api-reference/endpoint/conclusions
 - **Dreams**: https://docs.honcho.dev/v3/api-reference/endpoint/dreams
+- **Scopes**: https://docs.honcho.dev/v3/api-reference/endpoint/scopes
 - **Webhooks**: https://docs.honcho.dev/v3/api-reference/endpoint/webhooks
 - **API Keys**: https://docs.honcho.dev/v3/api-reference/endpoint/keys
 
