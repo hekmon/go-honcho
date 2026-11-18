@@ -11,10 +11,13 @@ const (
 	keyBaseURI = "/v3/keys"
 )
 
-// CreateKey creates a new API key with optional scoping.
+// CreateKey creates a new scoped API key.
 //
 // Keys can be scoped to a workspace, peer, or session for fine-grained access control.
 // An optional expiration time can also be set.
+//
+// It requires an admin key, and returns only the key value: Honcho does not send
+// back the key's scopes, expiration or creation time.
 //
 // https://docs.honcho.dev/v3/api-reference/endpoint/keys/create-key
 func (c *Client) CreateKey(ctx context.Context, req CreateKeyRequest) (result *Key, err error) {
