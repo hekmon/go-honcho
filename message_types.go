@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"time"
+	"unicode/utf8"
 )
 
 // Message represents a message in a session
@@ -46,7 +47,7 @@ func (req MessageCreate) Validate() error {
 	if req.Content == "" {
 		return errors.New("content is required")
 	}
-	if len(req.Content) > 25000 {
+	if utf8.RuneCountInString(req.Content) > 25000 {
 		return errors.New("content must be 25000 characters or less")
 	}
 	if req.PeerID == "" {

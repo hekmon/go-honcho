@@ -1088,6 +1088,18 @@ if req.Distance != nil && (*req.Distance < 0.0 || *req.Distance > 1.0) {
 if req.Distance != nil && (*req.Distance < 0 || *req.Distance > 1) {
 ```
 
+**For string length limits:**
+
+```go
+// ✅ Limits count characters, so use utf8.RuneCountInString
+if utf8.RuneCountInString(req.Content) > 25000 {
+    return errors.New("content must be 25000 characters or less")
+}
+
+// ❌ Don't use len: it counts bytes, so multi-byte text is refused below the limit
+if len(req.Content) > 25000 {
+```
+
 **Copy exact constraints from the OpenAPI spec - do not approximate:**
 
 ```yaml

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"regexp"
 	"time"
+	"unicode/utf8"
 )
 
 // peerIDPattern validates peer ID format
@@ -186,7 +187,7 @@ func (req DialecticOptions) Validate() error {
 	if req.Query == "" {
 		return errors.New("query is required")
 	}
-	if len(req.Query) > 10000 {
+	if utf8.RuneCountInString(req.Query) > 10000 {
 		return errors.New("query must be 10000 characters or less")
 	}
 	return nil

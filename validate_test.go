@@ -43,3 +43,50 @@ func TestValidateID(t *testing.T) {
 		}
 	}
 }
+
+// Message content, chat queries and conclusion content are accepted up to their
+// limit in characters, as upstream counts them, and refused when longer, however
+// many bytes each character takes. Regression test: Validate counted bytes, so
+// text holding multi-byte characters was refused well below the limit and never
+// reached the server.
+func TestValidateTextLength(t *testing.T) {
+	requests := []struct {
+		name     string
+		limit    int
+		errMsg   string
+		validate func(text string) error
+	}{
+		{"MessageCreate", 25000, "content must be 25000 characters or less", func(text string) error {
+			return MessageCreate{Content: text, PeerID: "peer"}.Validate()
+		}},
+		{"DialecticOptions", 10000, "query must be 10000 characters or less", func(text string) error {
+			return DialecticOptions{Query: text}.Validate()
+		}},
+		{"ConclusionCreate", 65535, "content must be 65535 characters or less", func(text string) error {
+			return ConclusionCreate{Content: text, ObserverID: "observer", ObservedID: "observed"}.Validate()
+		}},
+	}
+	characters := []struct {
+		name      string
+		character string
+	}{
+		{"1-byte character", "a"},
+		{"2-byte character", "é"},
+		{"4-byte character", "😀"},
+	}
+	for _, request := range requests {
+		for _, tt := range characters {
+			t.Run(request.name+"/"+tt.name+"/at the limit", func(t *testing.T) {
+				if err := request.validate(strings.Repeat(tt.character, request.limit)); err != nil {
+					t.Errorf("Validate() error = %v, want nil", err)
+				}
+			})
+			t.Run(request.name+"/"+tt.name+"/one over the limit", func(t *testing.T) {
+				err := request.validate(strings.Repeat(tt.character, request.limit+1))
+				if err == nil || err.Error() != request.errMsg {
+					t.Errorf("Validate() error = %v, want %q", err, request.errMsg)
+				}
+			})
+		}
+	}
+}

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"unicode/utf8"
 )
 
 // CreateConclusions creates one or more Conclusions.
@@ -128,7 +129,7 @@ func (req ConclusionCreate) Validate() error {
 	if req.Content == "" {
 		return errors.New("content is required")
 	}
-	if len(req.Content) > 65535 {
+	if utf8.RuneCountInString(req.Content) > 65535 {
 		return errors.New("content must be 65535 characters or less")
 	}
 	if req.ObserverID == "" {
