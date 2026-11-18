@@ -22,9 +22,13 @@ func (c *Client) GetOrCreateSession(ctx context.Context, workspaceID string, req
 	if err = req.Validate(); err != nil {
 		return
 	}
+	requestURL, err := c.endpoint(workspaceBaseURI, workspaceID, "sessions")
+	if err != nil {
+		return
+	}
 	result = new(Session)
 	if _, err = c.request(
-		ctx, http.MethodPost, c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "sessions"), nil,
+		ctx, http.MethodPost, requestURL, nil,
 		req, &result,
 	); err != nil {
 		err = fmt.Errorf("failed to execute request: %w", err)
@@ -41,7 +45,10 @@ func (c *Client) GetSessions(ctx context.Context, workspaceID string, req *Sessi
 		err = errors.New("workspaceID is required")
 		return
 	}
-	requestURL := c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "sessions", "list")
+	requestURL, err := c.endpoint(workspaceBaseURI, workspaceID, "sessions", "list")
+	if err != nil {
+		return
+	}
 	if opts != nil {
 		query := requestURL.Query()
 		if opts.Page > 0 {
@@ -75,9 +82,13 @@ func (c *Client) UpdateSession(ctx context.Context, workspaceID, sessionID strin
 		err = errors.New("sessionID is required")
 		return
 	}
+	requestURL, err := c.endpoint(workspaceBaseURI, workspaceID, "sessions", sessionID)
+	if err != nil {
+		return
+	}
 	result = new(Session)
 	if _, err = c.request(
-		ctx, http.MethodPut, c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "sessions", sessionID), nil,
+		ctx, http.MethodPut, requestURL, nil,
 		req, &result,
 	); err != nil {
 		err = fmt.Errorf("failed to execute request: %w", err)
@@ -103,8 +114,12 @@ func (c *Client) DeleteSession(ctx context.Context, workspaceID, sessionID strin
 		err = errors.New("sessionID is required")
 		return
 	}
+	requestURL, err := c.endpoint(workspaceBaseURI, workspaceID, "sessions", sessionID)
+	if err != nil {
+		return
+	}
 	if _, err = c.request(
-		ctx, http.MethodDelete, c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "sessions", sessionID), nil,
+		ctx, http.MethodDelete, requestURL, nil,
 		nil, nil,
 	); err != nil {
 		err = fmt.Errorf("failed to execute request: %w", err)
@@ -125,7 +140,10 @@ func (c *Client) CloneSession(ctx context.Context, workspaceID, sessionID string
 		err = errors.New("sessionID is required")
 		return
 	}
-	requestURL := c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "sessions", sessionID, "clone")
+	requestURL, err := c.endpoint(workspaceBaseURI, workspaceID, "sessions", sessionID, "clone")
+	if err != nil {
+		return
+	}
 	if opts != nil && opts.MessageID != nil {
 		query := requestURL.Query()
 		query.Set("message_id", *opts.MessageID)
@@ -154,7 +172,10 @@ func (c *Client) GetSessionPeers(ctx context.Context, workspaceID, sessionID str
 		err = errors.New("sessionID is required")
 		return
 	}
-	requestURL := c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "sessions", sessionID, "peers")
+	requestURL, err := c.endpoint(workspaceBaseURI, workspaceID, "sessions", sessionID, "peers")
+	if err != nil {
+		return
+	}
 	if opts != nil {
 		query := requestURL.Query()
 		if opts.Page > 0 {
@@ -190,9 +211,13 @@ func (c *Client) SetSessionPeers(ctx context.Context, workspaceID, sessionID str
 		err = errors.New("sessionID is required")
 		return
 	}
+	requestURL, err := c.endpoint(workspaceBaseURI, workspaceID, "sessions", sessionID, "peers")
+	if err != nil {
+		return
+	}
 	result = new(Session)
 	if _, err = c.request(
-		ctx, http.MethodPut, c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "sessions", sessionID, "peers"), nil,
+		ctx, http.MethodPut, requestURL, nil,
 		peers, &result,
 	); err != nil {
 		err = fmt.Errorf("failed to execute request: %w", err)
@@ -213,9 +238,13 @@ func (c *Client) AddPeersToSession(ctx context.Context, workspaceID, sessionID s
 		err = errors.New("sessionID is required")
 		return
 	}
+	requestURL, err := c.endpoint(workspaceBaseURI, workspaceID, "sessions", sessionID, "peers")
+	if err != nil {
+		return
+	}
 	result = new(Session)
 	if _, err = c.request(
-		ctx, http.MethodPost, c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "sessions", sessionID, "peers"), nil,
+		ctx, http.MethodPost, requestURL, nil,
 		peers, &result,
 	); err != nil {
 		err = fmt.Errorf("failed to execute request: %w", err)
@@ -240,9 +269,13 @@ func (c *Client) RemovePeersFromSession(ctx context.Context, workspaceID, sessio
 		err = errors.New("peerIDs is required")
 		return
 	}
+	requestURL, err := c.endpoint(workspaceBaseURI, workspaceID, "sessions", sessionID, "peers")
+	if err != nil {
+		return
+	}
 	result = new(Session)
 	if _, err = c.request(
-		ctx, http.MethodDelete, c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "sessions", sessionID, "peers"), nil,
+		ctx, http.MethodDelete, requestURL, nil,
 		peerIDs, &result,
 	); err != nil {
 		err = fmt.Errorf("failed to execute request: %w", err)
@@ -268,7 +301,10 @@ func (c *Client) GetSessionContext(ctx context.Context, workspaceID, sessionID s
 		err = errors.New("sessionID is required")
 		return
 	}
-	requestURL := c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "sessions", sessionID, "context")
+	requestURL, err := c.endpoint(workspaceBaseURI, workspaceID, "sessions", sessionID, "context")
+	if err != nil {
+		return
+	}
 	if opts != nil {
 		query := requestURL.Query()
 		if opts.Tokens != nil {
@@ -329,9 +365,13 @@ func (c *Client) GetSessionSummaries(ctx context.Context, workspaceID, sessionID
 		err = errors.New("sessionID is required")
 		return
 	}
+	requestURL, err := c.endpoint(workspaceBaseURI, workspaceID, "sessions", sessionID, "summaries")
+	if err != nil {
+		return
+	}
 	result = new(SessionSummaries)
 	if _, err = c.request(
-		ctx, http.MethodGet, c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "sessions", sessionID, "summaries"), nil,
+		ctx, http.MethodGet, requestURL, nil,
 		nil, &result,
 	); err != nil {
 		err = fmt.Errorf("failed to execute request: %w", err)
@@ -357,8 +397,12 @@ func (c *Client) SearchSession(ctx context.Context, workspaceID, sessionID strin
 	if err = req.Validate(); err != nil {
 		return
 	}
+	requestURL, err := c.endpoint(workspaceBaseURI, workspaceID, "sessions", sessionID, "search")
+	if err != nil {
+		return
+	}
 	if _, err = c.request(
-		ctx, http.MethodPost, c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "sessions", sessionID, "search"), nil,
+		ctx, http.MethodPost, requestURL, nil,
 		req, &result,
 	); err != nil {
 		err = fmt.Errorf("failed to execute request: %w", err)
@@ -383,9 +427,13 @@ func (c *Client) GetPeerConfig(ctx context.Context, workspaceID, sessionID, peer
 		err = errors.New("peerID is required")
 		return
 	}
+	requestURL, err := c.endpoint(workspaceBaseURI, workspaceID, "sessions", sessionID, "peers", peerID, "config")
+	if err != nil {
+		return
+	}
 	result = new(SessionPeerConfig)
 	if _, err = c.request(
-		ctx, http.MethodGet, c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "sessions", sessionID, "peers", peerID, "config"), nil,
+		ctx, http.MethodGet, requestURL, nil,
 		nil, &result,
 	); err != nil {
 		err = fmt.Errorf("failed to execute request: %w", err)
@@ -410,8 +458,12 @@ func (c *Client) SetPeerConfig(ctx context.Context, workspaceID, sessionID, peer
 		err = errors.New("peerID is required")
 		return
 	}
+	requestURL, err := c.endpoint(workspaceBaseURI, workspaceID, "sessions", sessionID, "peers", peerID, "config")
+	if err != nil {
+		return
+	}
 	if _, err = c.request(
-		ctx, http.MethodPut, c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "sessions", sessionID, "peers", peerID, "config"), nil,
+		ctx, http.MethodPut, requestURL, nil,
 		config, nil,
 	); err != nil {
 		err = fmt.Errorf("failed to execute request: %w", err)

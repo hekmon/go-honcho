@@ -248,14 +248,23 @@ const (
 )
 
 // ✅ In peer.go, session.go, webhook.go, etc. - ALWAYS reuse workspaceBaseURI
-requestURL := c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "peers")
-requestURL := c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "webhooks")
+requestURL, err := c.endpoint(workspaceBaseURI, workspaceID, "peers")
+if err != nil {
+    return
+}
+requestURL, err := c.endpoint(workspaceBaseURI, workspaceID, "webhooks")
+if err != nil {
+    return
+}
 
 // ✅ In key.go - different base path, so create keyBaseURI
 const (
     keyBaseURI = "/v3/keys"  // ✅ correct - genuinely different base path
 )
-requestURL := c.baseURL.JoinPath(keyBaseURI)
+requestURL, err := c.endpoint(keyBaseURI)
+if err != nil {
+    return
+}
 
 // ❌ Don't define redundant constants for /v3/workspaces paths
 const (
@@ -432,6 +441,7 @@ Before finalizing a method, verify:
 - [ ] Validation called ONLY if `Validate()` method exists on the request type
 - [ ] If ALL fields are optional (no `Validate()` method), do NOT call `req.Validate()`
 - [ ] Uses `workspaceBaseURI` constant (or appropriate `*BaseURI`)
+- [ ] URL built with `c.endpoint()`, its error returned before any request
 - [ ] Uses `c.request()` method
 - [ ] Errors wrapped with `%w`
 - [ ] Naked returns (no explicit return values)
@@ -446,8 +456,11 @@ func (c *Client) MethodName(req RequestType) (result *ResultType, err error) {
         return
     }
     
-    // 2. Construct URL using JoinPath
-    requestURL := c.baseURL.JoinPath(endpointPath)
+    // 2. Construct URL using c.endpoint
+    requestURL, err := c.endpoint(endpointPath)
+    if err != nil {
+        return
+    }
     
     // 3. Initialize result
     result = new(ResultType)
@@ -492,19 +505,30 @@ func (c *Client) DeleteWorkspace(workspaceID string) (err error) {
         err = errors.New("workspaceID is required")
         return
     }
-    requestURL := c.baseURL.JoinPath(workspaceBaseURI, workspaceID)
+    requestURL, err := c.endpoint(workspaceBaseURI, workspaceID)
+    if err != nil {
+        return
+    }
     // ...
 }
 
 // ✅ Multiple path parameters
 func (c *Client) CreateMessagesWithFile(workspaceID, sessionID string, req MessageUpload) (result []*Message, err error) {
-    requestURL := c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "sessions", sessionID, "messages", "upload")
+    requestURL, err := c.endpoint(workspaceBaseURI, workspaceID, "sessions", sessionID, "messages", "upload")
+    if err != nil {
+        return
+    }
     // ...
 }
 
-// ❌ Don't concatenate path strings manually
-requestURL := c.baseURL.JoinPath(workspaceBaseURI + "/" + workspaceID)  // WRONG!
+// ❌ Don't concatenate path strings manually: the first argument is not checked
+requestURL, err := c.endpoint(workspaceBaseURI + "/" + workspaceID)  // WRONG!
+
+// ❌ Don't call JoinPath directly: the IDs would be neither checked nor escaped
+requestURL := c.baseURL.JoinPath(workspaceBaseURI, workspaceID)  // WRONG!
 ```
+
+**Rule: URLs must only be built through `c.endpoint()`.** `JoinPath` cleans dot segments and does not escape `/`, so an ID such as `../sessions/victim` would send the request to another resource. `c.endpoint` refuses `""`, `.`, `..` and any ID holding a `/` with an error wrapping `ErrInvalidID`, and escapes everything else with `url.PathEscape`. A `/` is refused rather than escaped because Honcho decodes `%2F` before routing. Its first argument is kept as it is, so it must be a `*BaseURI` constant and never hold an ID. `TestOnlyEndpointJoinsPaths` fails on any `JoinPath` outside `c.endpoint`.
 
 ### HTTP Methods
 
@@ -538,7 +562,10 @@ http.MethodGet    // for operations with request body (use POST)
 ```go
 // ✅ Build query parameters using url.Values
 func (c *Client) GetSessions(workspaceID string, opts *GetSessionsOptions) (result *PageSession, err error) {
-    requestURL := c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "sessions")
+    requestURL, err := c.endpoint(workspaceBaseURI, workspaceID, "sessions")
+    if err != nil {
+        return
+    }
     
     // Add query parameters
     if opts != nil {
@@ -574,7 +601,10 @@ func (c *Client) SearchMessages(workspaceID string, req MessageSearchOptions, op
         return
     }
     
-    requestURL := c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "messages", "search")
+    requestURL, err := c.endpoint(workspaceBaseURI, workspaceID, "messages", "search")
+    if err != nil {
+        return
+    }
     
     // Add query parameters (if any)
     if opts != nil {
@@ -1031,7 +1061,10 @@ func (c *Client) GetOrCreateWorkspace(req CreateWorkspaceRequest) (result *Works
 // ✅ When ALL fields are optional, do NOT call Validate() (method doesn't exist)
 func (c *Client) CreateKey(req CreateKeyRequest) (result *Key, err error) {
     // No validation call - all fields are optional, Validate() method doesn't exist
-    requestURL := c.baseURL.JoinPath(keyBaseURI)
+    requestURL, err := c.endpoint(keyBaseURI)
+    if err != nil {
+        return
+    }
     // ... rest of implementation
 }
 
@@ -1291,7 +1324,7 @@ func (c *Client) request(method string, requestURL *url.URL, headers http.Header
 
 **Parameters:**
 - `method`: HTTP method (GET, POST, PUT, DELETE, etc.)
-- `requestURL`: Full URL constructed with `JoinPath()`
+- `requestURL`: Full URL constructed with `c.endpoint()`
 - `headers`: Optional HTTP headers (nil for most cases)
 - `body`: Request body (string, url.Values, struct/map, or io.Reader for multipart)
 - `result`: Pointer to result struct, `*bytes.Buffer` for raw response, `streamHandler` for an event stream, or nil for no response
@@ -1341,7 +1374,10 @@ func (c *Client) CreateMessagesWithFile(workspaceID, sessionID string, req Messa
         return
     }
     // Construct URL
-    requestURL := c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "sessions", sessionID, "messages", "upload")
+    requestURL, err := c.endpoint(workspaceBaseURI, workspaceID, "sessions", sessionID, "messages", "upload")
+    if err != nil {
+        return
+    }
     // Build multipart form
     bodyBuffer := &bytes.Buffer{}
     writer := multipart.NewWriter(bodyBuffer)
@@ -1511,7 +1547,10 @@ func (c *Client) GetPeer(workspaceID, peerID string) (result *Peer, err error) {
         return
     }
     // Construct URL
-    requestURL := c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "peers", peerID)
+    requestURL, err := c.endpoint(workspaceBaseURI, workspaceID, "peers", peerID)
+    if err != nil {
+        return
+    }
     // Initialize result
     result = new(Peer)
     // Make request
@@ -1609,7 +1648,7 @@ grep "type.*struct" peer.go        # Should find nothing
 **Constants & URLs:**
 - ✅ Reuse `workspaceBaseURI` constant from `workspace.go` for endpoints starting with `/v3/workspaces`
 - ✅ Create a new `*BaseURI` constant only for genuinely different base paths (e.g., `/v3/keys`)
-- ✅ Use `JoinPath()` for URL construction (never concatenate strings)
+- ✅ Use `c.endpoint()` for URL construction (never concatenate strings), and return its error before any request
 
 **Method Implementation:**
 - ✅ Use named returns: `(result *Type, err error)`
@@ -1654,6 +1693,7 @@ grep "type.*struct" peer.go        # Should find nothing
 - ❌ Define `*BaseURI` constants for paths that start with `/v3/workspaces` (always use `workspaceBaseURI`)
 - ❌ Create new `*BaseURI` constants unnecessarily (only for truly different base paths like `/v3/keys`)
 - ❌ Hardcode full URLs or concatenate path strings manually
+- ❌ Call `JoinPath()` outside `c.endpoint()`: an unchecked ID can redirect the request to another resource
 
 **Method Implementation:**
 - ❌ Omit descriptive block comments for methods

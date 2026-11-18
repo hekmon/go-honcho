@@ -12,6 +12,11 @@ import (
 	"strings"
 )
 
+// ErrInvalidID is the error, wrapped, of a method given an ID that cannot be a
+// segment of a request's path: an empty ID, "." or "..", or an ID holding a "/".
+// No request is sent for such an ID. Test for it with errors.Is.
+var ErrInvalidID = errors.New("invalid ID")
+
 // streamHandler is a result that reads the response body as it arrives: request
 // asks for an event stream and calls the handler once the status is handled,
 // returning its error. As request drains the body afterwards, a handler leaving
@@ -19,6 +24,28 @@ import (
 // connection is not reused: a server failing a stream closes it after answering,
 // and the transport does not retry a POST sent on a connection being closed.
 type streamHandler func(io.Reader) error
+
+// endpoint returns the URL of base, one of this package's path constants, followed
+// by segments, each becoming exactly one segment of the path. Every URL must be built
+// here: a caller-supplied ID must not be able to point a request at another resource.
+//
+// An empty segment, "." and ".." are refused with an error wrapping ErrInvalidID, as
+// joining them would clean them away and leave the request on a parent path. So is a
+// segment holding a "/", which escaping would not make safe: Honcho decodes %2F before
+// routing, so the session ID "victim/peers", once escaped, would still reach the peers
+// route of the session victim. Any other character is escaped with url.PathEscape, and
+// reaches the server as part of a literal ID.
+func (c *Client) endpoint(base string, segments ...string) (*url.URL, error) {
+	elements := make([]string, 0, len(segments)+1)
+	elements = append(elements, base)
+	for _, segment := range segments {
+		if segment == "" || segment == "." || segment == ".." || strings.Contains(segment, "/") {
+			return nil, fmt.Errorf("%w: %q", ErrInvalidID, segment)
+		}
+		elements = append(elements, url.PathEscape(segment))
+	}
+	return c.baseURL.JoinPath(elements...), nil
+}
 
 func (c *Client) request(ctx context.Context, method string, requestURL *url.URL, headers http.Header, body, result any) (responseHeaders http.Header, err error) {
 	// Build request

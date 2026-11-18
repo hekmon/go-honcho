@@ -23,7 +23,10 @@ func (c *Client) CreateConclusions(ctx context.Context, workspaceID string, req 
 	if err = req.Validate(); err != nil {
 		return
 	}
-	requestURL := c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "conclusions")
+	requestURL, err := c.endpoint(workspaceBaseURI, workspaceID, "conclusions")
+	if err != nil {
+		return
+	}
 	result = make([]*Conclusion, 0, len(req.Conclusions))
 	if _, err = c.request(ctx, http.MethodPost, requestURL, nil, req, &result); err != nil {
 		err = fmt.Errorf("failed to create conclusions: %w", err)
@@ -46,7 +49,10 @@ func (c *Client) DeleteConclusion(ctx context.Context, workspaceID, conclusionID
 		err = errors.New("conclusionID is required")
 		return
 	}
-	requestURL := c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "conclusions", conclusionID)
+	requestURL, err := c.endpoint(workspaceBaseURI, workspaceID, "conclusions", conclusionID)
+	if err != nil {
+		return
+	}
 	if _, err = c.request(ctx, http.MethodDelete, requestURL, nil, nil, nil); err != nil {
 		err = fmt.Errorf("failed to delete conclusion: %w", err)
 		return
@@ -68,7 +74,10 @@ func (c *Client) GetConclusion(ctx context.Context, workspaceID, conclusionID st
 		err = errors.New("conclusionID is required")
 		return
 	}
-	requestURL := c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "conclusions", conclusionID)
+	requestURL, err := c.endpoint(workspaceBaseURI, workspaceID, "conclusions", conclusionID)
+	if err != nil {
+		return
+	}
 	result = new(Conclusion)
 	if _, err = c.request(ctx, http.MethodGet, requestURL, nil, nil, &result); err != nil {
 		err = fmt.Errorf("failed to get conclusion: %w", err)
@@ -87,7 +96,10 @@ func (c *Client) ListConclusions(ctx context.Context, workspaceID string, req *C
 		err = errors.New("workspaceID is required")
 		return
 	}
-	requestURL := c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "conclusions", "list")
+	requestURL, err := c.endpoint(workspaceBaseURI, workspaceID, "conclusions", "list")
+	if err != nil {
+		return
+	}
 	query := requestURL.Query()
 	if opts != nil {
 		if opts.Reverse {
@@ -125,7 +137,10 @@ func (c *Client) QueryConclusions(ctx context.Context, workspaceID string, req C
 	if err = req.Validate(); err != nil {
 		return
 	}
-	requestURL := c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "conclusions", "query")
+	requestURL, err := c.endpoint(workspaceBaseURI, workspaceID, "conclusions", "query")
+	if err != nil {
+		return
+	}
 	result = make([]*Conclusion, 0, req.TopK)
 	if _, err = c.request(ctx, http.MethodPost, requestURL, nil, req, &result); err != nil {
 		err = fmt.Errorf("failed to query conclusions: %w", err)

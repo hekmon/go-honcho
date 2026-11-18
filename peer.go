@@ -25,9 +25,13 @@ func (c *Client) GetOrCreatePeer(ctx context.Context, workspaceID string, req Pe
 	if err = req.Validate(); err != nil {
 		return
 	}
+	requestURL, err := c.endpoint(workspaceBaseURI, workspaceID, "peers")
+	if err != nil {
+		return
+	}
 	result = new(Peer)
 	if _, err = c.request(
-		ctx, http.MethodPost, c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "peers"), nil,
+		ctx, http.MethodPost, requestURL, nil,
 		req, &result,
 	); err != nil {
 		err = fmt.Errorf("failed to execute request: %w", err)
@@ -44,7 +48,10 @@ func (c *Client) GetAllPeers(ctx context.Context, workspaceID string, req *PeerG
 		err = errors.New("workspaceID is required")
 		return
 	}
-	requestURL := c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "peers", "list")
+	requestURL, err := c.endpoint(workspaceBaseURI, workspaceID, "peers", "list")
+	if err != nil {
+		return
+	}
 	if opts != nil {
 		query := requestURL.Query()
 		if opts.Page > 0 {
@@ -78,9 +85,13 @@ func (c *Client) UpdatePeer(ctx context.Context, workspaceID, peerID string, req
 		err = errors.New("peerID is required")
 		return
 	}
+	requestURL, err := c.endpoint(workspaceBaseURI, workspaceID, "peers", peerID)
+	if err != nil {
+		return
+	}
 	result = new(Peer)
 	if _, err = c.request(
-		ctx, http.MethodPut, c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "peers", peerID), nil,
+		ctx, http.MethodPut, requestURL, nil,
 		req, &result,
 	); err != nil {
 		err = fmt.Errorf("failed to execute request: %w", err)
@@ -108,9 +119,13 @@ func (c *Client) GetRepresentation(ctx context.Context, workspaceID, peerID stri
 		err = errors.New("peerID is required")
 		return
 	}
+	requestURL, err := c.endpoint(workspaceBaseURI, workspaceID, "peers", peerID, "representation")
+	if err != nil {
+		return
+	}
 	result = new(RepresentationResponse)
 	if _, err = c.request(
-		ctx, http.MethodPost, c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "peers", peerID, "representation"), nil,
+		ctx, http.MethodPost, requestURL, nil,
 		req, &result,
 	); err != nil {
 		err = fmt.Errorf("failed to execute request: %w", err)
@@ -134,7 +149,10 @@ func (c *Client) GetPeerCard(ctx context.Context, workspaceID, peerID string, ta
 		err = errors.New("peerID is required")
 		return
 	}
-	requestURL := c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "peers", peerID, "card")
+	requestURL, err := c.endpoint(workspaceBaseURI, workspaceID, "peers", peerID, "card")
+	if err != nil {
+		return
+	}
 	if target != nil {
 		query := requestURL.Query()
 		query.Set("target", *target)
@@ -169,7 +187,10 @@ func (c *Client) SetPeerCard(ctx context.Context, workspaceID, peerID string, re
 	if err = req.Validate(); err != nil {
 		return
 	}
-	requestURL := c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "peers", peerID, "card")
+	requestURL, err := c.endpoint(workspaceBaseURI, workspaceID, "peers", peerID, "card")
+	if err != nil {
+		return
+	}
 	if target != nil {
 		query := requestURL.Query()
 		query.Set("target", *target)
@@ -204,7 +225,10 @@ func (c *Client) GetPeerContext(ctx context.Context, workspaceID, peerID string,
 		err = errors.New("peerID is required")
 		return
 	}
-	requestURL := c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "peers", peerID, "context")
+	requestURL, err := c.endpoint(workspaceBaseURI, workspaceID, "peers", peerID, "context")
+	if err != nil {
+		return
+	}
 	query := requestURL.Query()
 	if opts != nil {
 		if opts.Target != nil {
@@ -250,7 +274,10 @@ func (c *Client) GetSessionsForPeer(ctx context.Context, workspaceID, peerID str
 		err = errors.New("peerID is required")
 		return
 	}
-	requestURL := c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "peers", peerID, "sessions")
+	requestURL, err := c.endpoint(workspaceBaseURI, workspaceID, "peers", peerID, "sessions")
+	if err != nil {
+		return
+	}
 	if opts != nil {
 		query := requestURL.Query()
 		if opts.Page > 0 {
@@ -287,9 +314,13 @@ func (c *Client) SearchPeer(ctx context.Context, workspaceID, peerID string, req
 	if err = req.Validate(); err != nil {
 		return
 	}
+	requestURL, err := c.endpoint(workspaceBaseURI, workspaceID, "peers", peerID, "search")
+	if err != nil {
+		return
+	}
 	result = new([]Message)
 	if _, err = c.request(
-		ctx, http.MethodPost, c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "peers", peerID, "search"), nil,
+		ctx, http.MethodPost, requestURL, nil,
 		req, &result,
 	); err != nil {
 		err = fmt.Errorf("failed to execute request: %w", err)
@@ -323,9 +354,13 @@ func (c *Client) Chat(ctx context.Context, workspaceID, peerID string, req Diale
 	if err = req.Validate(); err != nil {
 		return
 	}
+	requestURL, err := c.endpoint(workspaceBaseURI, workspaceID, "peers", peerID, "chat")
+	if err != nil {
+		return
+	}
 	result = new(DialecticResponse)
 	if _, err = c.request(
-		ctx, http.MethodPost, c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "peers", peerID, "chat"), nil,
+		ctx, http.MethodPost, requestURL, nil,
 		req, &result,
 	); err != nil {
 		err = fmt.Errorf("failed to execute request: %w", err)
@@ -365,6 +400,11 @@ func (c *Client) ChatStream(ctx context.Context, workspaceID, peerID string, req
 			yield("", err)
 			return
 		}
+		requestURL, err := c.endpoint(workspaceBaseURI, workspaceID, "peers", peerID, "chat")
+		if err != nil {
+			yield("", err)
+			return
+		}
 		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
 		var stopped, done bool
@@ -396,8 +436,8 @@ func (c *Client) ChatStream(ctx context.Context, workspaceID, peerID string, req
 				}
 			}
 		})
-		_, err := c.request(
-			ctx, http.MethodPost, c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "peers", peerID, "chat"), nil,
+		_, err = c.request(
+			ctx, http.MethodPost, requestURL, nil,
 			req, handler,
 		)
 		switch {

@@ -21,7 +21,10 @@ const (
 //
 // https://docs.honcho.dev/v3/api-reference/endpoint/keys/create-key
 func (c *Client) CreateKey(ctx context.Context, req CreateKeyRequest) (result *Key, err error) {
-	requestURL := c.baseURL.JoinPath(keyBaseURI)
+	requestURL, err := c.endpoint(keyBaseURI)
+	if err != nil {
+		return
+	}
 	query := requestURL.Query()
 	if req.WorkspaceID != "" {
 		query.Set("workspace_id", req.WorkspaceID)

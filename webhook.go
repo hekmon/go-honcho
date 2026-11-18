@@ -17,7 +17,10 @@ func (c *Client) GetOrCreateWebhookEndpoint(ctx context.Context, workspaceID str
 		return
 	}
 	// Construct URL
-	requestURL := c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "webhooks")
+	requestURL, err := c.endpoint(workspaceBaseURI, workspaceID, "webhooks")
+	if err != nil {
+		return
+	}
 	// Initialize result
 	result = new(WebhookEndpoint)
 	// Make request
@@ -41,7 +44,10 @@ func (c *Client) ListWebhookEndpoints(ctx context.Context, workspaceID string, o
 		}
 	}
 	// Construct URL
-	requestURL := c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "webhooks")
+	requestURL, err := c.endpoint(workspaceBaseURI, workspaceID, "webhooks")
+	if err != nil {
+		return
+	}
 	// Add query parameters
 	if opts != nil {
 		query := requestURL.Query()
@@ -79,7 +85,10 @@ func (c *Client) DeleteWebhookEndpoint(ctx context.Context, workspaceID, endpoin
 		return
 	}
 	// Construct URL
-	requestURL := c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "webhooks", endpointID)
+	requestURL, err := c.endpoint(workspaceBaseURI, workspaceID, "webhooks", endpointID)
+	if err != nil {
+		return
+	}
 	// Make request (204 No Content expected)
 	if _, err = c.request(ctx, http.MethodDelete, requestURL, nil, nil, nil); err != nil {
 		err = fmt.Errorf("failed to delete webhook endpoint: %w", err)
@@ -100,7 +109,10 @@ func (c *Client) TestEmit(ctx context.Context, workspaceID string) (err error) {
 		return
 	}
 	// Construct URL
-	requestURL := c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "webhooks", "test")
+	requestURL, err := c.endpoint(workspaceBaseURI, workspaceID, "webhooks", "test")
+	if err != nil {
+		return
+	}
 	// Make request
 	if _, err = c.request(ctx, http.MethodGet, requestURL, nil, nil, nil); err != nil {
 		err = fmt.Errorf("failed to test webhook emit: %w", err)

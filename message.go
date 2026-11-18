@@ -16,7 +16,10 @@ func (c *Client) CreateMessagesForSession(ctx context.Context, workspaceID, sess
 		return
 	}
 	// Construct URL
-	requestURL := c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "sessions", sessionID, "messages")
+	requestURL, err := c.endpoint(workspaceBaseURI, workspaceID, "sessions", sessionID, "messages")
+	if err != nil {
+		return
+	}
 	// Initialize result
 	result = make([]*Message, 0, len(req.Messages))
 	// Make request
@@ -34,7 +37,10 @@ func (c *Client) CreateMessagesWithFile(ctx context.Context, workspaceID, sessio
 		return
 	}
 	// Construct URL
-	requestURL := c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "sessions", sessionID, "messages", "upload")
+	requestURL, err := c.endpoint(workspaceBaseURI, workspaceID, "sessions", sessionID, "messages", "upload")
+	if err != nil {
+		return
+	}
 	// Build multipart form
 	bodyBuffer := &bytes.Buffer{}
 	writer := multipart.NewWriter(bodyBuffer)
@@ -95,7 +101,10 @@ func (c *Client) CreateMessagesWithFile(ctx context.Context, workspaceID, sessio
 // https://docs.honcho.dev/v3/api-reference/endpoint/messages/get-message
 func (c *Client) GetMessage(ctx context.Context, workspaceID, sessionID, messageID string) (result *Message, err error) {
 	// Construct URL
-	requestURL := c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "sessions", sessionID, "messages", messageID)
+	requestURL, err := c.endpoint(workspaceBaseURI, workspaceID, "sessions", sessionID, "messages", messageID)
+	if err != nil {
+		return
+	}
 	// Initialize result
 	result = new(Message)
 	// Make request
@@ -109,7 +118,10 @@ func (c *Client) GetMessage(ctx context.Context, workspaceID, sessionID, message
 // https://docs.honcho.dev/v3/api-reference/endpoint/messages/get-messages
 func (c *Client) GetMessages(ctx context.Context, workspaceID, sessionID string, req *MessageGet, options *GetMessagesOptions) (result *PageMessage, err error) {
 	// Construct URL
-	requestURL := c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "sessions", sessionID, "messages", "list")
+	requestURL, err := c.endpoint(workspaceBaseURI, workspaceID, "sessions", sessionID, "messages", "list")
+	if err != nil {
+		return
+	}
 	// Add query parameters
 	queryParams := requestURL.Query()
 	if options != nil {
@@ -137,7 +149,10 @@ func (c *Client) GetMessages(ctx context.Context, workspaceID, sessionID string,
 // https://docs.honcho.dev/v3/api-reference/endpoint/messages/update-message
 func (c *Client) UpdateMessage(ctx context.Context, workspaceID, sessionID, messageID string, req MessageUpdate) (result *Message, err error) {
 	// Construct URL
-	requestURL := c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "sessions", sessionID, "messages", messageID)
+	requestURL, err := c.endpoint(workspaceBaseURI, workspaceID, "sessions", sessionID, "messages", messageID)
+	if err != nil {
+		return
+	}
 	// Initialize result
 	result = new(Message)
 	// Make request
