@@ -100,12 +100,14 @@ type PeerCardResponse struct {
 
 // PeerCardSet represents the request body for setting a peer card
 type PeerCardSet struct {
+	// PeerCard replaces the whole peer card. An empty non-nil list clears the card.
+	// A nil list is refused by Validate, as it would be sent as null, which upstream refuses.
 	PeerCard []string `json:"peer_card"`
 }
 
 // Validate checks that mandatory fields are valid
 func (req PeerCardSet) Validate() error {
-	if len(req.PeerCard) == 0 {
+	if req.PeerCard == nil {
 		return errors.New("peer_card is required")
 	}
 	return nil
