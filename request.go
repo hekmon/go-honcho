@@ -71,7 +71,7 @@ func (c *Client) request(ctx context.Context, method string, requestURL *url.URL
 			}
 		default:
 			if err = json.NewEncoder(&bodyBuffer).Encode(body); err != nil {
-				err = fmt.Errorf("failed to encode body: %s", err)
+				err = fmt.Errorf("failed to encode body: %w", err)
 				return
 			}
 			headers = setContentType(headers, "application/json; charset=utf-8")
@@ -83,7 +83,7 @@ func (c *Client) request(ctx context.Context, method string, requestURL *url.URL
 	}
 	req, err := http.NewRequestWithContext(ctx, method, requestURL.String(), bodyReader)
 	if err != nil {
-		err = fmt.Errorf("failed to build request: %s", err)
+		err = fmt.Errorf("failed to build request: %w", err)
 		return
 	}
 	// Set headers
@@ -105,7 +105,8 @@ func (c *Client) request(ctx context.Context, method string, requestURL *url.URL
 	// Execute request
 	resp, err := c.http.Do(req)
 	if err != nil {
-		err = fmt.Errorf("failed to execute request: %s", err)
+		// Returned as it is: a *url.Error names the method and the URL, and every
+		// caller adds its own context.
 		return
 	}
 	defer func() {
@@ -170,7 +171,7 @@ func (c *Client) request(ctx context.Context, method string, requestURL *url.URL
 		}
 		//fmt.Println(string(data))
 		if err = json.Unmarshal(data, result); err != nil {
-			err = fmt.Errorf("failed to decode response: %s", err)
+			err = fmt.Errorf("failed to decode response: %w", err)
 			return
 		}
 		return
@@ -178,7 +179,7 @@ func (c *Client) request(ctx context.Context, method string, requestURL *url.URL
 	switch typedResult := result.(type) {
 	case *bytes.Buffer:
 		if _, err = io.Copy(typedResult, resp.Body); err != nil {
-			err = fmt.Errorf("failed to copy response to bytes buffer: %s", err)
+			err = fmt.Errorf("failed to copy response to bytes buffer: %w", err)
 			return
 		}
 		return
