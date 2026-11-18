@@ -515,7 +515,7 @@ if err != nil {
 
 - **Required fields** - Must be provided (e.g., `ID`, `Content`)
 - **ID format** - Must contain only letters, numbers, underscores, or hyphens
-- **Length constraints** - IDs must be 100 characters or less
+- **Length constraints** - IDs must be 512 characters or less
 - **Numeric constraints** - Pagination and limits have min/max values
 
 ## Pagination

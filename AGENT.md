@@ -982,8 +982,8 @@ func (req CreateWorkspaceRequest) Validate() error {
     if req.ID == "" {
         return errors.New("id is required")
     }
-    if len(req.ID) > 100 {
-        return errors.New("id must be 100 characters or less")
+    if len(req.ID) > 512 {
+        return errors.New("id must be 512 characters or less")
     }
     if !workspaceIDPattern.MatchString(req.ID) {
         return errors.New("id must contain only letters, numbers, underscores, or hyphens")

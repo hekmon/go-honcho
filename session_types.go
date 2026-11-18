@@ -11,7 +11,7 @@ var sessionIDPattern = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 
 // SessionCreate represents the request body for creating/getting a session
 type SessionCreate struct {
-	// ID is the session identifier (required, 1-100 characters, pattern: ^[a-zA-Z0-9_-]+$)
+	// ID is the session identifier (required, 1-512 characters, pattern: ^[a-zA-Z0-9_-]+$)
 	ID string `json:"id"`
 	// Metadata is optional metadata for the session
 	Metadata json.RawMessage `json:"metadata,omitempty"`
@@ -26,8 +26,8 @@ func (req SessionCreate) Validate() error {
 	if req.ID == "" {
 		return errors.New("id is required")
 	}
-	if len(req.ID) > 100 {
-		return errors.New("id must be 100 characters or less")
+	if len(req.ID) > 512 {
+		return errors.New("id must be 512 characters or less")
 	}
 	if !sessionIDPattern.MatchString(req.ID) {
 		return errors.New("id must contain only letters, numbers, underscores, or hyphens")
