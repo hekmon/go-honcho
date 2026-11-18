@@ -198,12 +198,73 @@ func (req DialecticOptions) Validate() error {
 	return nil
 }
 
-// DialecticResponse represents the response for chatting with a peer's representation
+// DialecticResponse represents the response for chatting with a peer's representation or a whole workspace
 type DialecticResponse struct {
 	Content *string `json:"content"`
+	// Evidence is what the answer was built from. Present only when include_evidence is true
+	Evidence *Evidence `json:"evidence,omitempty"`
 }
 
-// dialecticStreamFrame represents a frame of the event stream ChatStream reads
+// Evidence represents what the dialectic agent read and did while answering. It is collated
+// from the agent's own reads rather than reported by the model, so it is deterministic but
+// over-reports: it lists what the agent accessed, which is not necessarily what the answer relied on
+type Evidence struct {
+	// Conclusions are the conclusions the agent read, whether prefetched or found via its tools
+	Conclusions []EvidenceObservation `json:"conclusions"`
+	// Messages are the messages the agent read via its search and grep tools, by ID and provenance
+	// only. Fetch a message to read its content
+	Messages []EvidenceMessageRef `json:"messages"`
+	// ToolCalls are the tools the agent invoked, in order, with their arguments. Results are omitted
+	// (they are reflected in Conclusions and Messages), and so are calls that failed, so this is a
+	// record of successful invocations rather than a complete reasoning trace
+	ToolCalls []EvidenceToolCall `json:"tool_calls"`
+	// ReasoningTraceID is the ID of the stored reasoning trace for this call, when trace storage is enabled
+	ReasoningTraceID *string `json:"reasoning_trace_id,omitempty"`
+}
+
+// EvidenceObservation represents a conclusion the dialectic agent read while answering
+type EvidenceObservation struct {
+	// ID is the conclusion (document) ID
+	ID string `json:"id"`
+	// Level is the conclusion level: explicit, deductive, inductive, or contradiction
+	Level ConclusionLevel `json:"level"`
+	// Content is the conclusion text (the derived conclusion, for non-explicit levels)
+	Content string `json:"content"`
+	// CreatedAt is when the conclusion was derived, from its source messages when known
+	CreatedAt time.Time `json:"created_at"`
+	// SessionID is the session the conclusion is scoped to, if any
+	SessionID *string `json:"session_id,omitempty"`
+	// ObserverID is the peer who made the conclusion
+	ObserverID string `json:"observer_id"`
+	// ObservedID is the peer the conclusion is about
+	ObservedID string `json:"observed_id"`
+	// SourceIDs are the IDs of the conclusions this one was derived from. Empty for explicit
+	// conclusions, which derive from messages rather than from other conclusions
+	SourceIDs []string `json:"source_ids"`
+}
+
+// EvidenceMessageRef represents a message the dialectic agent read while answering: its identity
+// and provenance only, without its content. Fetch the message by ID when the text is needed
+type EvidenceMessageRef struct {
+	// ID is the message ID
+	ID string `json:"id"`
+	// SessionID is the session the message belongs to
+	SessionID string `json:"session_id"`
+	// PeerID is the peer who sent the message
+	PeerID string `json:"peer_id"`
+	// CreatedAt is when the message was sent
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// EvidenceToolCall represents a tool the dialectic agent invoked while answering
+type EvidenceToolCall struct {
+	// ToolName is the name of the tool
+	ToolName string `json:"tool_name"`
+	// ToolInput holds the arguments the agent passed to the tool, as a JSON object
+	ToolInput json.RawMessage `json:"tool_input"`
+}
+
+// dialecticStreamFrame represents a frame of the event stream ChatStream and WorkspaceChatStream read
 type dialecticStreamFrame struct {
 	// Delta holds the next chunk of the answer, if the frame has one
 	Delta struct {

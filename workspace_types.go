@@ -5,6 +5,7 @@ import (
 	"errors"
 	"regexp"
 	"time"
+	"unicode/utf8"
 )
 
 // CreateWorkspaceRequest represents the request body for creating/getting a workspace
@@ -177,4 +178,53 @@ type PageWorkspace struct {
 	Page  int         `json:"page"`
 	Size  int         `json:"size"`
 	Pages int         `json:"pages"`
+}
+
+// WorkspaceChatOptions represents the request body for chatting with a whole workspace
+type WorkspaceChatOptions struct {
+	// Query is the workspace chat prompt (required, 1-10000 characters)
+	Query string `json:"query"`
+	// SessionID is an optional session to scope message tools to. Mutually exclusive with Scope
+	SessionID *string `json:"session_id,omitempty"`
+	// Scope is optional (unprefixed) scope names restricting recall to the union of the scopes'
+	// member sessions (explicit allowlist, fail-closed: an empty union recalls nothing). Nil leaves
+	// recall unrestricted and an empty non-nil list is refused (1-100 scopes). Mutually exclusive
+	// with SessionID. Requires a workspace- or admin-level key
+	Scope []string `json:"scope,omitempty"`
+	// ReasoningLevel is the level of reasoning to apply: minimal, low, medium, high, or max (default: low)
+	ReasoningLevel ReasoningLevel `json:"reasoning_level,omitempty"`
+	// ResponseFormat is an optional JSON Schema (root type "object") the response must conform to.
+	// When provided, the response's content is a JSON string matching this schema
+	ResponseFormat json.RawMessage `json:"response_format,omitempty"`
+	// IncludeEvidence is whether the response includes an evidence object listing the conclusions and
+	// messages the agent read while answering, plus the tool calls it made (default: false). Evidence
+	// is collated from what the agent accessed; the model is never asked to cite anything, so evidence
+	// may over-report (accessed is not the same as used). WorkspaceChatStream refuses it
+	IncludeEvidence bool `json:"include_evidence,omitempty"`
+}
+
+// Validate checks that mandatory fields are valid
+func (req WorkspaceChatOptions) Validate() error {
+	if req.Query == "" {
+		return errors.New("query is required")
+	}
+	if utf8.RuneCountInString(req.Query) > 10000 {
+		return errors.New("query must be 10000 characters or less")
+	}
+	// A non-nil empty scope is an allowlist of nothing. With omitempty it would silently be left
+	// out of the request, turning it into unrestricted recall across the whole workspace.
+	if req.Scope != nil && len(req.Scope) == 0 {
+		return errors.New("scope must hold at least one scope: leave it nil for no restriction")
+	}
+	if len(req.Scope) > 100 {
+		return errors.New("scope must hold 100 scopes or less")
+	}
+	return nil
+}
+
+// workspaceChatStreamRequest represents the request body WorkspaceChatStream sends
+type workspaceChatStreamRequest struct {
+	WorkspaceChatOptions
+	// Stream asks for the answer as an event stream
+	Stream bool `json:"stream"`
 }

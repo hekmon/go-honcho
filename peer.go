@@ -8,6 +8,7 @@ import (
 	"io"
 	"iter"
 	"net/http"
+	"net/url"
 	"strconv"
 )
 
@@ -405,49 +406,59 @@ func (c *Client) ChatStream(ctx context.Context, workspaceID, peerID string, req
 			yield("", err)
 			return
 		}
-		ctx, cancel := context.WithCancel(ctx)
+		c.streamDialectic(ctx, requestURL, req, yield)
+	}
+}
+
+// streamDialectic sends a chat request whose body asks for an event stream and yields
+// the answer chunk by chunk, for ChatStream and WorkspaceChatStream.
+//
+// Any failure yields a single error and ends the iteration, and that includes a stream
+// the server ends before finishing the answer. Leaving the caller's loop cancels the
+// request.
+func (c *Client) streamDialectic(ctx context.Context, requestURL *url.URL, req any, yield func(string, error) bool) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	var stopped, done bool
+	handler := streamHandler(func(body io.Reader) error {
+		// Client.request drains the body once this returns, which would last as
+		// long as the server keeps the stream open: whatever ends the handler,
+		// a panic in the caller's loop included, ends the request first.
 		defer cancel()
-		var stopped, done bool
-		handler := streamHandler(func(body io.Reader) error {
-			// Client.request drains the body once this returns, which would last as
-			// long as the server keeps the stream open: whatever ends the handler,
-			// a panic in the caller's loop included, ends the request first.
-			defer cancel()
-			reader := bufio.NewReader(body)
-			for {
-				line, readErr := reader.ReadBytes('\n')
-				if readErr != nil && readErr != io.EOF {
-					return fmt.Errorf("failed to read stream: %w", readErr)
-				}
-				var frame dialecticStreamFrame
-				if err := frame.decodeLine(line); err != nil {
-					return err
-				}
-				if frame.Delta.Content != "" && !yield(frame.Delta.Content, nil) {
-					stopped = true
-					return nil
-				}
-				if frame.Done {
-					done = true
-					return nil
-				}
-				if readErr == io.EOF {
-					return nil
-				}
+		reader := bufio.NewReader(body)
+		for {
+			line, readErr := reader.ReadBytes('\n')
+			if readErr != nil && readErr != io.EOF {
+				return fmt.Errorf("failed to read stream: %w", readErr)
 			}
-		})
-		_, err = c.request(
-			ctx, http.MethodPost, requestURL, nil,
-			req, handler,
-		)
-		switch {
-		case stopped:
-			// The caller left the loop: yield must not be called again.
-		case err != nil:
-			yield("", fmt.Errorf("failed to execute request: %w", err))
-		case !done:
-			// This also covers a 202 or a 204, whose body Client.request does not read.
-			yield("", errors.New("stream ended before its final frame: the answer is incomplete"))
+			var frame dialecticStreamFrame
+			if err := frame.decodeLine(line); err != nil {
+				return err
+			}
+			if frame.Delta.Content != "" && !yield(frame.Delta.Content, nil) {
+				stopped = true
+				return nil
+			}
+			if frame.Done {
+				done = true
+				return nil
+			}
+			if readErr == io.EOF {
+				return nil
+			}
 		}
+	})
+	_, err := c.request(
+		ctx, http.MethodPost, requestURL, nil,
+		req, handler,
+	)
+	switch {
+	case stopped:
+		// The caller left the loop: yield must not be called again.
+	case err != nil:
+		yield("", fmt.Errorf("failed to execute request: %w", err))
+	case !done:
+		// This also covers a 202 or a 204, whose body Client.request does not read.
+		yield("", errors.New("stream ended before its final frame: the answer is incomplete"))
 	}
 }

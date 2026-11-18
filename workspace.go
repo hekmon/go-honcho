@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"iter"
 	"net/http"
 	"strconv"
 )
@@ -206,4 +207,85 @@ func (c *Client) SearchWorkspace(ctx context.Context, workspaceID string, req Me
 		return
 	}
 	return
+}
+
+// WorkspaceChat queries a whole Workspace using natural language.
+//
+// Runs the Dialectic agent over every peer in the workspace rather than a single
+// (observer, observed) pair: there is no anchor peer and no target. Set SessionID to
+// narrow message tools to one session, or Scope to restrict recall to the union of the
+// named scopes' member sessions (always an allowlist, even for a single name: a scope
+// with no member sessions recalls nothing). SessionID and Scope are mutually exclusive.
+// Requires a workspace- or admin-level key.
+//
+// WorkspaceChat reads the whole answer at once: use WorkspaceChatStream to read it as
+// an event stream.
+//
+// https://docs.honcho.dev/v3/api-reference/endpoint/workspaces/chat-workspace
+func (c *Client) WorkspaceChat(ctx context.Context, workspaceID string, req WorkspaceChatOptions) (result *DialecticResponse, err error) {
+	if workspaceID == "" {
+		err = errors.New("workspaceID is required")
+		return
+	}
+	if err = req.Validate(); err != nil {
+		return
+	}
+	requestURL, err := c.endpoint(workspaceBaseURI, workspaceID, "chat")
+	if err != nil {
+		return
+	}
+	result = new(DialecticResponse)
+	if _, err = c.request(
+		ctx, http.MethodPost, requestURL, nil,
+		req, &result,
+	); err != nil {
+		err = fmt.Errorf("failed to execute request: %w", err)
+		return
+	}
+	return
+}
+
+// WorkspaceChatStream queries a whole Workspace using natural language, as WorkspaceChat
+// does, and returns the answer chunk by chunk.
+//
+// The answer arrives when the agent finishes gathering context, usually as a single
+// chunk: only an answer synthesized at the tool-call limit streams as it is generated.
+//
+// The request is sent when the returned iterator is ranged over. Any failure yields a
+// single error and ends the iteration, and that includes a stream the server ends
+// before finishing the answer: an iteration that ends without an error has read the
+// whole answer. Breaking out of the loop cancels the request.
+//
+// An iterator has no way to return evidence, so a request with IncludeEvidence set is
+// refused before anything is sent: use WorkspaceChat to read the evidence.
+//
+//	for chunk, err := range client.WorkspaceChatStream(ctx, workspaceID, req) {
+//		if err != nil {
+//			return err
+//		}
+//		fmt.Print(chunk)
+//	}
+//
+// https://docs.honcho.dev/v3/api-reference/endpoint/workspaces/chat-workspace
+func (c *Client) WorkspaceChatStream(ctx context.Context, workspaceID string, req WorkspaceChatOptions) iter.Seq2[string, error] {
+	return func(yield func(string, error) bool) {
+		if workspaceID == "" {
+			yield("", errors.New("workspaceID is required"))
+			return
+		}
+		if req.IncludeEvidence {
+			yield("", errors.New("include_evidence is not supported by WorkspaceChatStream: use WorkspaceChat instead"))
+			return
+		}
+		if err := req.Validate(); err != nil {
+			yield("", err)
+			return
+		}
+		requestURL, err := c.endpoint(workspaceBaseURI, workspaceID, "chat")
+		if err != nil {
+			yield("", err)
+			return
+		}
+		c.streamDialectic(ctx, requestURL, workspaceChatStreamRequest{WorkspaceChatOptions: req, Stream: true}, yield)
+	}
 }

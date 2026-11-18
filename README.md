@@ -167,6 +167,23 @@ status, err = client.GetQueueStatus("my-workspace", &observerID, nil, &sessionID
 err = client.ScheduleDream("my-workspace", honcho.ScheduleDreamRequest{
     CollectionID: "collection-123",
 })
+
+// Query the whole workspace in natural language, here within two scopes
+response, err := client.WorkspaceChat(ctx, "my-workspace", honcho.WorkspaceChatOptions{
+    Query:           "What are the peers working on?",
+    Scope:           []string{"team-a", "team-b"},
+    IncludeEvidence: true, // response.Evidence lists what the agent read
+})
+
+// Stream the answer (evidence is only available through WorkspaceChat)
+for chunk, err := range client.WorkspaceChatStream(ctx, "my-workspace", honcho.WorkspaceChatOptions{
+    Query: "What are the peers working on?",
+}) {
+    if err != nil {
+        log.Fatal(err)
+    }
+    fmt.Print(chunk)
+}
 ```
 
 ### Peer Operations

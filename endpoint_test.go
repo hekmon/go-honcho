@@ -125,12 +125,25 @@ func TestMethodsRefuseUnsafeIDs(t *testing.T) {
 		peers       = map[string]*SessionPeerConfig{"alice": {}}
 		webhook     = WebhookEndpointCreate{URL: "https://example.test/webhook"}
 		dream       = ScheduleDreamRequest{Observer: "alice", DreamType: DreamTypeOmni}
+		chatOptions = WorkspaceChatOptions{Query: "query"}
 	)
 	// chatStream ranges over a ChatStream to its end and returns the one error it
 	// must yield before stopping.
 	chatStream := func(workspaceID, peerID string) error {
 		var yielded []error
 		for _, err := range client.ChatStream(ctx, workspaceID, peerID, dialectic) {
+			yielded = append(yielded, err)
+		}
+		if len(yielded) != 1 {
+			return fmt.Errorf("%d values yielded, want one error: %v", len(yielded), yielded)
+		}
+		return yielded[0]
+	}
+	// workspaceChatStream ranges over a WorkspaceChatStream to its end and returns the
+	// one error it must yield before stopping.
+	workspaceChatStream := func(workspaceID string) error {
+		var yielded []error
+		for _, err := range client.WorkspaceChatStream(ctx, workspaceID, chatOptions) {
 			yielded = append(yielded, err)
 		}
 		if len(yielded) != 1 {
@@ -253,6 +266,8 @@ func TestMethodsRefuseUnsafeIDs(t *testing.T) {
 		{"GetQueueStatus/workspaceID", func(id string) error { return errorOf(client.GetQueueStatus(ctx, id, nil, nil, nil)) }},
 		{"ScheduleDream/workspaceID", func(id string) error { return client.ScheduleDream(ctx, id, dream) }},
 		{"SearchWorkspace/workspaceID", func(id string) error { return errorOf(client.SearchWorkspace(ctx, id, search)) }},
+		{"WorkspaceChat/workspaceID", func(id string) error { return errorOf(client.WorkspaceChat(ctx, id, chatOptions)) }},
+		{"WorkspaceChatStream/workspaceID", workspaceChatStream},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
