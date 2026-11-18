@@ -122,6 +122,7 @@ The SDK is organized by API categories. Each category has its own methods and ty
 | **Session** | Manage sessions (conversation threads) | `session.go`, `session_types.go` |
 | **Message** | Send and retrieve messages | `message.go`, `message_types.go` |
 | **Conclusion** | Manage conclusions (derived insights) | `conclusion.go`, `conclusion_types.go` |
+| **Dream** | Review what each dream changed in a representation | `dream.go`, `dream_types.go` |
 | **Webhook** | Configure webhook endpoints | `webhook.go`, `webhook_types.go` |
 | **Key** | Manage API keys | `key.go`, `key_types.go` |
 
@@ -444,6 +445,29 @@ conclusion, err := client.GetConclusion(ctx, "workspace-id", "conclusion-id")
 
 // Delete a conclusion
 err = client.DeleteConclusion("workspace-id", "conclusion-id")
+```
+
+### Dream Operations
+
+```go
+// List dream runs, newest first (paginated) - pass nil for req when no filters needed
+page, err := client.ListDreams(ctx, "workspace-id", nil, &honcho.ListDreamsOptions{
+    Page: 1,
+    Size: 20,
+})
+
+// List the runs of one representation that started in a date range
+observedID, observerID := "user-123", "user-456"
+page, err = client.ListDreams(ctx, "workspace-id", &honcho.DreamRunList{
+    ObservedID: &observedID,
+    ObserverID: &observerID,
+    Filters: map[string]any{
+        "started_at": map[string]any{"gte": "2026-01-01"},
+    },
+}, nil)
+
+// Get one run with every change it committed
+dream, err := client.GetDream(ctx, "workspace-id", "run-id")
 ```
 
 ### Webhook Operations
@@ -799,6 +823,7 @@ For complete API documentation, visit:
 - **Sessions**: https://docs.honcho.dev/v3/api-reference/endpoint/sessions
 - **Messages**: https://docs.honcho.dev/v3/api-reference/endpoint/messages
 - **Conclusions**: https://docs.honcho.dev/v3/api-reference/endpoint/conclusions
+- **Dreams**: https://docs.honcho.dev/v3/api-reference/endpoint/dreams
 - **Webhooks**: https://docs.honcho.dev/v3/api-reference/endpoint/webhooks
 - **API Keys**: https://docs.honcho.dev/v3/api-reference/endpoint/keys
 

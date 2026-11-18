@@ -1,0 +1,77 @@
+package honcho
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"net/http"
+	"strconv"
+)
+
+// ListDreams lists dream runs, newest first.
+//
+// Results are paginated. Each run records what one dream changed in a representation.
+// Filter by `observed_id` for a peer's history, and add `observer_id` for a single
+// representation. `filters` takes the shared filter object, e.g.
+// `{"started_at": {"gte": "2026-01-01"}}` for the runs that started in a date range.
+// Runs are not pruned unless the server sets a retention window.
+//
+// Honcho answers 422 for a filter on a column it cannot filter on.
+//
+// https://docs.honcho.dev/v3/api-reference/endpoint/dreams/list-dreams
+func (c *Client) ListDreams(ctx context.Context, workspaceID string, req *DreamRunList, opts *ListDreamsOptions) (result *PageDreamRun, err error) {
+	if workspaceID == "" {
+		err = errors.New("workspaceID is required")
+		return
+	}
+	requestURL, err := c.endpoint(workspaceBaseURI, workspaceID, "dreams", "list")
+	if err != nil {
+		return
+	}
+	query := requestURL.Query()
+	if opts != nil {
+		if opts.Page > 0 {
+			query.Set("page", strconv.Itoa(opts.Page))
+		}
+		if opts.Size > 0 {
+			query.Set("size", strconv.Itoa(opts.Size))
+		}
+	}
+	requestURL.RawQuery = query.Encode()
+	result = new(PageDreamRun)
+	if _, err = c.request(ctx, http.MethodPost, requestURL, nil, req, result); err != nil {
+		err = fmt.Errorf("failed to list dreams: %w", err)
+		return
+	}
+	return
+}
+
+// GetDream gets one dream run with every change it committed.
+//
+// The response lists the conclusions the dream created with the conclusions each was
+// derived from, the conclusions it removed as they read when removed, and the peer card
+// before and after.
+//
+// Honcho answers 404 for an unknown run or a run in another workspace.
+//
+// https://docs.honcho.dev/v3/api-reference/endpoint/dreams/get-dream
+func (c *Client) GetDream(ctx context.Context, workspaceID, runID string) (result *DreamRunDetail, err error) {
+	if workspaceID == "" {
+		err = errors.New("workspaceID is required")
+		return
+	}
+	if runID == "" {
+		err = errors.New("runID is required")
+		return
+	}
+	requestURL, err := c.endpoint(workspaceBaseURI, workspaceID, "dreams", runID)
+	if err != nil {
+		return
+	}
+	result = new(DreamRunDetail)
+	if _, err = c.request(ctx, http.MethodGet, requestURL, nil, nil, &result); err != nil {
+		err = fmt.Errorf("failed to get dream: %w", err)
+		return
+	}
+	return
+}

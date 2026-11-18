@@ -164,6 +164,10 @@ func TestMethodsRefuseUnsafeIDs(t *testing.T) {
 		{"ListConclusions/workspaceID", func(id string) error { return errorOf(client.ListConclusions(ctx, id, nil, nil)) }},
 		{"QueryConclusions/workspaceID", func(id string) error { return errorOf(client.QueryConclusions(ctx, id, query)) }},
 
+		{"ListDreams/workspaceID", func(id string) error { return errorOf(client.ListDreams(ctx, id, nil, nil)) }},
+		{"GetDream/workspaceID", func(id string) error { return errorOf(client.GetDream(ctx, id, "run")) }},
+		{"GetDream/runID", func(id string) error { return errorOf(client.GetDream(ctx, "workspace", id)) }},
+
 		{"CreateMessagesForSession/workspaceID", func(id string) error {
 			return errorOf(client.CreateMessagesForSession(ctx, id, "session", messages))
 		}},

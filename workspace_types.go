@@ -107,6 +107,8 @@ type DreamType string
 const (
 	// DreamTypeOmni represents an omni dream
 	DreamTypeOmni DreamType = "omni"
+	// DreamTypeCardRefresh represents a lightweight card-only refresh, which never creates or removes conclusions
+	DreamTypeCardRefresh DreamType = "card_refresh"
 )
 
 // ScheduleDreamRequest represents the request body for scheduling a dream
