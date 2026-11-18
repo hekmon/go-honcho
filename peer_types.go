@@ -123,12 +123,13 @@ type PeerContext struct {
 
 // Session represents a Honcho session
 type Session struct {
-	ID            string          `json:"id"`
-	IsActive      bool            `json:"is_active"`
-	WorkspaceID   string          `json:"workspace_id"`
-	Metadata      json.RawMessage `json:"metadata,omitempty"`
-	Configuration PeerConfig      `json:"configuration,omitzero"`
-	CreatedAt     time.Time       `json:"created_at"`
+	ID          string          `json:"id"`
+	IsActive    bool            `json:"is_active"`
+	WorkspaceID string          `json:"workspace_id"`
+	Metadata    json.RawMessage `json:"metadata,omitempty"`
+	// Configuration is the session-level configuration, nil when the response holds none
+	Configuration *SessionConfiguration `json:"configuration,omitempty"`
+	CreatedAt     time.Time             `json:"created_at"`
 }
 
 // GetAllPeersOptions represents optional parameters for GetAllPeers
