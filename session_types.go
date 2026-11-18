@@ -39,13 +39,15 @@ func (req SessionCreate) Validate() error {
 type SessionUpdate struct {
 	// Metadata is optional metadata to update
 	Metadata json.RawMessage `json:"metadata,omitempty"`
-	// Configuration is optional configuration to update
+	// Configuration is optional configuration to update: a section that is sent replaces the stored section of that name, other sections are kept
 	Configuration *SessionConfiguration `json:"configuration,omitempty"`
 }
 
 // SessionConfiguration represents the configuration options for a session
 // All fields are optional. Session-level configuration overrides workspace-level configuration.
 type SessionConfiguration struct {
+	// CustomInstructions is custom instructions shared by the deriver, summarizer, dialectic and dreamer (a module's own custom_instructions at the same level takes precedence)
+	CustomInstructions *string `json:"custom_instructions,omitempty"`
 	// Reasoning is configuration for reasoning functionality
 	Reasoning *ReasoningConfiguration `json:"reasoning,omitempty"`
 	// PeerCard is configuration for peer card functionality
@@ -54,13 +56,15 @@ type SessionConfiguration struct {
 	Summary *SummaryConfiguration `json:"summary,omitempty"`
 	// Dream is configuration for dream functionality
 	Dream *DreamConfiguration `json:"dream,omitempty"`
+	// Dialectic is configuration for the dialectic chat endpoints
+	Dialectic *DialecticConfiguration `json:"dialectic,omitempty"`
 }
 
 // ReasoningConfiguration represents the reasoning configuration
 type ReasoningConfiguration struct {
 	// Enabled indicates whether to enable reasoning functionality
 	Enabled *bool `json:"enabled"`
-	// CustomInstructions is TODO: currently unused. Custom instructions for the reasoning system
+	// CustomInstructions is custom instructions for the deriver (overrides the top-level custom_instructions at the same level, empty string to use none)
 	CustomInstructions *string `json:"custom_instructions,omitempty"`
 }
 
@@ -70,6 +74,8 @@ type PeerCardConfiguration struct {
 	Use *bool `json:"use"`
 	// Create indicates whether to generate peer card based on content
 	Create *bool `json:"create"`
+	// CustomInstructions is custom instructions for peer card updates, added on top of the dream instructions (does not fall back to the top-level custom_instructions)
+	CustomInstructions *string `json:"custom_instructions,omitempty"`
 }
 
 // SummaryConfiguration represents the summary configuration
@@ -80,12 +86,22 @@ type SummaryConfiguration struct {
 	MessagesPerShortSummary *int `json:"messages_per_short_summary,omitempty"`
 	// MessagesPerLongSummary is number of messages per long summary (minimum: 20, must be > messages_per_short_summary)
 	MessagesPerLongSummary *int `json:"messages_per_long_summary,omitempty"`
+	// CustomInstructions is custom instructions for session summaries (overrides the top-level custom_instructions at the same level, empty string to use none)
+	CustomInstructions *string `json:"custom_instructions,omitempty"`
 }
 
 // DreamConfiguration represents the dream configuration
 type DreamConfiguration struct {
 	// Enabled indicates whether to enable dream functionality
 	Enabled *bool `json:"enabled"`
+	// CustomInstructions is custom instructions for dreams (overrides the top-level custom_instructions at the same level, empty string to use none)
+	CustomInstructions *string `json:"custom_instructions,omitempty"`
+}
+
+// DialecticConfiguration represents the dialectic configuration
+type DialecticConfiguration struct {
+	// CustomInstructions is custom instructions for the dialectic chat endpoints (overrides the top-level custom_instructions at the same level, empty string to use none)
+	CustomInstructions *string `json:"custom_instructions,omitempty"`
 }
 
 // SessionPeerConfig represents the session-level configuration for a peer

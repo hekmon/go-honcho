@@ -41,10 +41,14 @@ type Workspace struct {
 
 // WorkspaceConfiguration represents the configuration options for a workspace
 type WorkspaceConfiguration struct {
-	Reasoning *ReasoningConfig `json:"reasoning,omitempty"`
-	PeerCard  *PeerCardConfig  `json:"peer_card,omitempty"`
-	Summary   *SummaryConfig   `json:"summary,omitempty"`
-	Dream     *DreamConfig     `json:"dream,omitempty"`
+	// CustomInstructions is custom instructions shared by the deriver, summarizer, dialectic and dreamer (a module's own custom_instructions at the same level takes precedence)
+	CustomInstructions *string          `json:"custom_instructions,omitempty"`
+	Reasoning          *ReasoningConfig `json:"reasoning,omitempty"`
+	PeerCard           *PeerCardConfig  `json:"peer_card,omitempty"`
+	Summary            *SummaryConfig   `json:"summary,omitempty"`
+	Dream              *DreamConfig     `json:"dream,omitempty"`
+	// Dialectic is configuration for the dialectic chat endpoints
+	Dialectic *DialecticConfig `json:"dialectic,omitempty"`
 }
 
 // ReasoningConfig represents the reasoning configuration
@@ -57,6 +61,8 @@ type ReasoningConfig struct {
 type PeerCardConfig struct {
 	Use    *bool `json:"use"`
 	Create *bool `json:"create"`
+	// CustomInstructions is custom instructions for peer card updates, added on top of the dream instructions (does not fall back to the top-level custom_instructions)
+	CustomInstructions *string `json:"custom_instructions,omitempty"`
 }
 
 // SummaryConfig represents the summary configuration
@@ -64,11 +70,21 @@ type SummaryConfig struct {
 	Enabled                 *bool `json:"enabled"`
 	MessagesPerShortSummary *int  `json:"messages_per_short_summary,omitempty"`
 	MessagesPerLongSummary  *int  `json:"messages_per_long_summary,omitempty"`
+	// CustomInstructions is custom instructions for session summaries (overrides the top-level custom_instructions at the same level, empty string to use none)
+	CustomInstructions *string `json:"custom_instructions,omitempty"`
 }
 
 // DreamConfig represents the dream configuration
 type DreamConfig struct {
 	Enabled *bool `json:"enabled"`
+	// CustomInstructions is custom instructions for dreams (overrides the top-level custom_instructions at the same level, empty string to use none)
+	CustomInstructions *string `json:"custom_instructions,omitempty"`
+}
+
+// DialecticConfig represents the dialectic configuration
+type DialecticConfig struct {
+	// CustomInstructions is custom instructions for the dialectic chat endpoints (overrides the top-level custom_instructions at the same level, empty string to use none)
+	CustomInstructions *string `json:"custom_instructions,omitempty"`
 }
 
 // WorkspaceGetRequest represents the request body for getting all workspaces
@@ -78,7 +94,9 @@ type WorkspaceGetRequest struct {
 
 // UpdateWorkspaceRequest represents the request body for updating a workspace
 type UpdateWorkspaceRequest struct {
-	Metadata      json.RawMessage         `json:"metadata,omitempty"`
+	Metadata json.RawMessage `json:"metadata,omitempty"`
+	// Configuration replaces the entire stored configuration. An empty non-nil value clears it.
+	// A nil value leaves it unchanged.
 	Configuration *WorkspaceConfiguration `json:"configuration,omitempty"`
 }
 

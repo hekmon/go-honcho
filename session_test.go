@@ -3,6 +3,7 @@ package honcho
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -60,4 +61,39 @@ func TestSessionConfiguration(t *testing.T) {
 			}
 		})
 	}
+}
+
+// A session's configuration, read and sent back as it is, reaches Honcho with
+// every section and value Honcho returned. Regression test: SessionConfiguration
+// lacked the dialectic section and the custom instructions outside the reasoning
+// section, so a read dropped them and writing the configuration back erased those
+// of the peer card, summary and dream sections, as a section that is sent
+// replaces the stored section of that name.
+func TestSessionConfigurationRoundTrip(t *testing.T) {
+	var update []byte
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPut {
+			var err error
+			if update, err = io.ReadAll(r.Body); err != nil {
+				t.Errorf("failed to read the request body: %v", err)
+			}
+		}
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{"id":"session","is_active":true,"workspace_id":"workspace","created_at":"2026-10-30T00:00:00Z","configuration":`+fullConfiguration+`}`)
+	}))
+	defer server.Close()
+	u, _ := url.Parse(server.URL)
+	client := New(&Options{BaseURL: u})
+
+	session, err := client.GetOrCreateSession(t.Context(), "workspace", SessionCreate{ID: "session"})
+	if err != nil {
+		t.Fatalf("GetOrCreateSession: %v", err)
+	}
+	if _, err = client.UpdateSession(t.Context(), "workspace", "session", SessionUpdate{Configuration: session.Configuration}); err != nil {
+		t.Fatalf("UpdateSession: %v", err)
+	}
+	// Close waits for the handler, so what it recorded can be read.
+	server.Close()
+
+	checkFullConfiguration(t, update)
 }
