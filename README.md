@@ -96,6 +96,7 @@ client := honcho.New(&honcho.Options{
 ```go
 // Customize HTTP client settings (timeouts, transport, etc.)
 import (
+    "net/http"
     "time"
 
     "github.com/hashicorp/go-cleanhttp"
@@ -104,6 +105,8 @@ import (
 // Start with cleanhttp.DefaultPooledClient() and modify as needed
 httpClient := cleanhttp.DefaultPooledClient()
 httpClient.Timeout = 30 * time.Second
+// Stay below the server's 5 second keep-alive: a POST sent on a connection the server is closing fails with EOF
+httpClient.Transport.(*http.Transport).IdleConnTimeout = 4 * time.Second
 
 client := honcho.New(&honcho.Options{
     APIKey: "your-api-key",
