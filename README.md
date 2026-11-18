@@ -471,6 +471,11 @@ if err != nil {
     // Check for validation errors
     var valErr *honcho.HTTPValidationError
     if errors.As(err, &valErr) {
+        // Honcho's own validation errors are a text
+        if valErr.Message != "" {
+            log.Printf("Validation error: %s", valErr.Message)
+        }
+        // FastAPI's request validation errors are a list
         for _, detail := range valErr.Detail {
             log.Printf("Validation error at %v: %s", detail.Loc, detail.Msg)
         }
@@ -487,7 +492,7 @@ if err != nil {
 
 | Error Type | HTTP Status | Description |
 |------------|-------------|-------------|
-| `HTTPValidationError` | 422 | Request validation failed |
+| `HTTPValidationError` | 422 | Request validation failed: Honcho's own errors in `Message`, FastAPI's request validation errors in `Detail` |
 | Generic error | 4xx/5xx | Other API errors with status code |
 
 ## Validation

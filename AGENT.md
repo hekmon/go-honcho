@@ -369,8 +369,25 @@ Honcho docs support `.md` extension for direct markdown access:
 
 ```go
 // ✅ Implement ALL error schemas from the API docs
+// A 422's detail takes one of two forms: FastAPI's request validation errors,
+// a list, in Detail; or Honcho's own validation errors, a text, in Message.
 type HTTPValidationError struct {
-    Detail []ValidationError `json:"detail"`
+    Detail  []ValidationError
+    Message string
+}
+
+// UnmarshalJSON decodes a 422 response's body, whatever the form of its detail.
+func (e *HTTPValidationError) UnmarshalJSON(data []byte) error {
+    var body struct {
+        Detail json.RawMessage `json:"detail"`
+    }
+    if err := json.Unmarshal(data, &body); err != nil {
+        return err
+    }
+    if len(body.Detail) > 0 && body.Detail[0] == '"' {
+        return json.Unmarshal(body.Detail, &e.Message)
+    }
+    return json.Unmarshal(body.Detail, &e.Detail)
 }
 
 type ValidationError struct {
@@ -383,12 +400,18 @@ type ValidationError struct {
 
 // ✅ Handle ALL HTTP status codes from the API docs in request()
 case http.StatusUnprocessableEntity:
-    var valErr HTTPValidationError
-    if err = json.NewDecoder(resp.Body).Decode(&valErr); err != nil {
-        err = fmt.Errorf("failed to decode validation error: %w", err)
+    // The body is read once, then decoded from what was read
+    var data []byte
+    if data, err = io.ReadAll(resp.Body); err != nil {
+        err = fmt.Errorf("failed to read response body: %w", err)
         return
     }
-    err = fmt.Errorf("validation error: %w", &valErr)
+    var valErr HTTPValidationError
+    if err = json.Unmarshal(data, &valErr); err != nil {
+        err = fmt.Errorf("failed to decode validation error %q: %w", data, err)
+        return
+    }
+    err = &valErr // Error() already starts with "validation error: "
     return
 
 // ❌ Don't ignore error schemas or HTTP status codes from the API docs
@@ -712,18 +735,34 @@ return errors.New("message " + string(rune(i+1)) + ": " + err.Error())  // break
 ```go
 // ✅ Error types must implement Error() method and be wrapped with %w
 type HTTPValidationError struct {
-    Detail []ValidationError `json:"detail"`
+    Detail  []ValidationError
+    Message string
 }
 
 func (e *HTTPValidationError) Error() string {
-    return fmt.Sprintf("validation error: %v", e.Detail)
+    if e.Message != "" {
+        return "validation error: " + e.Message
+    }
+    errs := make([]string, len(e.Detail))
+    for i, d := range e.Detail {
+        loc := make([]string, len(d.Loc))
+        for j, l := range d.Loc {
+            loc[j] = fmt.Sprint(l)
+        }
+        errs[i] = strings.Join(loc, ".") + ": " + d.Msg
+    }
+    return "validation error: " + strings.Join(errs, "; ")
 }
 
-// In request handling:
-err = fmt.Errorf("validation error: %w", &valErr)
+// In request handling, returned as is:
+err = &valErr
+
+// In the API method calling request(), wrapped with what failed:
+err = fmt.Errorf("failed to create messages: %w", err)
 
 // ❌ Don't return error types without Error() method
 // ❌ Don't forget to wrap with %w for errors.As() support
+// ❌ Don't repeat in a wrap the prefix Error() already gives
 ```
 
 **Error Type Guidelines:**
@@ -756,7 +795,11 @@ err = fmt.Errorf("failed to get resource: %w", &NotFoundError{ResourceType: "pee
 // ✅ Check for specific error types using errors.As()
 var valErr *HTTPValidationError
 if errors.As(err, &valErr) {
-    // Handle validation error specifically
+    // Handle validation error specifically: Honcho's own errors are a text
+    if valErr.Message != "" {
+        // Process the message
+    }
+    // FastAPI's request validation errors are a list
     for _, detail := range valErr.Detail {
         // Process each validation error
     }

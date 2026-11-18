@@ -82,20 +82,19 @@ func (c *Client) request(ctx context.Context, method string, requestURL *url.URL
 	case http.StatusOK, http.StatusCreated:
 		// continue
 	case http.StatusUnprocessableEntity:
-		// Decode validation error
+		// Decode validation error: the body is read once, then decoded from
+		// what was read.
 		var data []byte
-		data, err = io.ReadAll(resp.Body)
-		if err != nil {
+		if data, err = io.ReadAll(resp.Body); err != nil {
 			err = fmt.Errorf("failed to read response body: %w", err)
 			return
 		}
-		fmt.Println(string(data))
 		var valErr HTTPValidationError
-		if err = json.NewDecoder(resp.Body).Decode(&valErr); err != nil {
-			err = fmt.Errorf("failed to decode validation error: %w", err)
+		if err = json.Unmarshal(data, &valErr); err != nil {
+			err = fmt.Errorf("failed to decode validation error %q: %w", data, err)
 			return
 		}
-		err = fmt.Errorf("validation error: %w", &valErr)
+		err = &valErr
 		return
 	default:
 		var builder strings.Builder
@@ -157,14 +156,43 @@ func setContentType(headers http.Header, contentType string) http.Header {
 	return headers
 }
 
-// HTTPValidationError represents a 422 validation error response
+// HTTPValidationError represents a 422 validation error response. Its detail
+// takes one of two forms: FastAPI's request validation errors, a list, in
+// Detail; or Honcho's own validation errors, a text, in Message.
 type HTTPValidationError struct {
-	Detail []ValidationError `json:"detail"`
+	Detail  []ValidationError
+	Message string
+}
+
+// UnmarshalJSON decodes a 422 response's body, whatever the form of its
+// detail.
+func (e *HTTPValidationError) UnmarshalJSON(data []byte) error {
+	var body struct {
+		Detail json.RawMessage `json:"detail"`
+	}
+	if err := json.Unmarshal(data, &body); err != nil {
+		return err
+	}
+	if len(body.Detail) > 0 && body.Detail[0] == '"' {
+		return json.Unmarshal(body.Detail, &e.Message)
+	}
+	return json.Unmarshal(body.Detail, &e.Detail)
 }
 
 // Error implements the error interface for HTTPValidationError
 func (e *HTTPValidationError) Error() string {
-	return fmt.Sprintf("validation error: %v", e.Detail)
+	if e.Message != "" {
+		return "validation error: " + e.Message
+	}
+	errs := make([]string, len(e.Detail))
+	for i, d := range e.Detail {
+		loc := make([]string, len(d.Loc))
+		for j, l := range d.Loc {
+			loc[j] = fmt.Sprint(l)
+		}
+		errs[i] = strings.Join(loc, ".") + ": " + d.Msg
+	}
+	return "validation error: " + strings.Join(errs, "; ")
 }
 
 // ValidationError represents a single validation error

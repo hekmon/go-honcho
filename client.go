@@ -29,23 +29,21 @@ type Options struct {
 }
 
 func New(options *Options) *Client {
-	if options == nil {
-		options = &Options{
-			BaseURL: ManagedServiceURL,
-			HTTP:    cleanhttp.DefaultPooledClient(),
-		}
-	} else {
-		if options.BaseURL == nil {
-			options.BaseURL = ManagedServiceURL
-		}
-		if options.HTTP == nil {
-			options.HTTP = cleanhttp.DefaultPooledClient()
-		}
+	// The defaults go into a copy: the caller's options stay as given.
+	var opts Options
+	if options != nil {
+		opts = *options
+	}
+	if opts.BaseURL == nil {
+		opts.BaseURL = ManagedServiceURL
+	}
+	if opts.HTTP == nil {
+		opts.HTTP = cleanhttp.DefaultPooledClient()
 	}
 	return &Client{
-		baseURL: options.BaseURL,
-		apiKey:  options.APIKey,
-		http:    http.DefaultClient,
+		baseURL: opts.BaseURL,
+		apiKey:  opts.APIKey,
+		http:    opts.HTTP,
 	}
 }
 
