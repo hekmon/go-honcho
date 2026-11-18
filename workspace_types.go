@@ -154,7 +154,8 @@ type QueueStatus struct {
 	Sessions            *map[string]SessionQueueStatus `json:"sessions,omitempty"`
 }
 
-// MessageSearchOptions represents the request body for searching messages
+// MessageSearchOptions represents the request body for searching the messages of a peer or a session.
+// SearchWorkspace takes WorkspaceMessageSearchOptions instead
 type MessageSearchOptions struct {
 	Query   string         `json:"query"`
 	Filters map[string]any `json:"filters,omitempty"`
@@ -171,6 +172,31 @@ func (req MessageSearchOptions) Validate() error {
 		return errors.New("limit must be between 1 and 100")
 	}
 	return nil
+}
+
+// WorkspaceMessageSearchOptions represents the request body for searching the messages of a workspace
+// with SearchWorkspace
+//
+// It is separate from MessageSearchOptions, the request body of SearchPeer and SearchSession, mirroring
+// upstream's two types. The peer and session routes silently ignore scope and return unrestricted
+// results, so with a shared type a caller of those routes could believe the results were restricted
+// when they are not
+type WorkspaceMessageSearchOptions struct {
+	// Query is the search query (required)
+	Query string `json:"query"`
+	// Filters is the filters to scope the search (optional)
+	Filters map[string]any `json:"filters,omitempty"`
+	// Limit is the maximum number of results to return (0=use default: 10, min: 1, max: 100)
+	Limit int `json:"limit,omitempty"`
+	// Scope is the name of a scope restricting the search to the scope's member sessions (optional, nil
+	// for no restriction). A scope with no member sessions returns no results. The server answers an
+	// unknown scope with a 404, and Scope set together with a session_id key in Filters with a 422
+	Scope *string `json:"scope,omitempty"`
+}
+
+// Validate checks that mandatory fields are valid, by the rules of MessageSearchOptions
+func (req WorkspaceMessageSearchOptions) Validate() error {
+	return MessageSearchOptions{Query: req.Query, Filters: req.Filters, Limit: req.Limit}.Validate()
 }
 
 // GetAllWorkspacesOptions represents optional parameters for GetAllWorkspaces

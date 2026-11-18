@@ -155,7 +155,7 @@ workspace, err = client.UpdateWorkspace("my-workspace", honcho.UpdateWorkspaceRe
 err = client.DeleteWorkspace("my-workspace")
 
 // Search messages in a workspace (returns pointer to slice: *[]Message)
-result, err := client.SearchWorkspace("my-workspace", honcho.MessageSearchOptions{
+result, err := client.SearchWorkspace(ctx, "my-workspace", honcho.WorkspaceMessageSearchOptions{
     Query: "important topic",
 })
 // result is *[]Message - dereference to access: messages := *result
@@ -249,6 +249,19 @@ messages, err := client.SearchPeer("workspace-id", "user-123", honcho.MessageSea
 // Chat with peer's representation
 response, err := client.Chat("workspace-id", "user-123", honcho.DialecticOptions{
     Query: "What does this peer prefer?",
+})
+
+// Answer from one scope's own representation of the peer
+response, err = client.Chat(ctx, "workspace-id", "user-123", honcho.DialecticOptions{
+    Query: "What does this peer prefer?",
+    Scope: honcho.OneScope("team-a"),
+})
+
+// Restrict recall to the member sessions of these scopes. A union is an allowlist of
+// sessions, even with a single name: ScopeUnion("team-a") is not OneScope("team-a")
+response, err = client.Chat(ctx, "workspace-id", "user-123", honcho.DialecticOptions{
+    Query: "What does this peer prefer?",
+    Scope: honcho.ScopeUnion("team-a", "team-b"),
 })
 
 // Stream the answer as it is generated
@@ -699,7 +712,7 @@ sessions, err := client.GetSessions(workspaceID, req, opts)  // *PageSession
 
 ```go
 // ✅ Dereference slice pointers to access elements
-result, err := client.SearchWorkspace("workspace-id", honcho.MessageSearchOptions{
+result, err := client.SearchWorkspace(ctx, "workspace-id", honcho.WorkspaceMessageSearchOptions{
     Query: "search query",
 })
 if err != nil {

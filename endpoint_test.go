@@ -120,6 +120,7 @@ func TestMethodsRefuseUnsafeIDs(t *testing.T) {
 		peer        = PeerCreate{ID: "alice"}
 		card        = PeerCardSet{PeerCard: []string{"card"}}
 		search      = MessageSearchOptions{Query: "query"}
+		wsSearch    = WorkspaceMessageSearchOptions{Query: "query"}
 		dialectic   = DialecticOptions{Query: "query"}
 		session     = SessionCreate{ID: "session"}
 		peers       = map[string]*SessionPeerConfig{"alice": {}}
@@ -298,7 +299,7 @@ func TestMethodsRefuseUnsafeIDs(t *testing.T) {
 		{"DeleteWorkspace/workspaceID", func(id string) error { return client.DeleteWorkspace(ctx, id) }},
 		{"GetQueueStatus/workspaceID", func(id string) error { return errorOf(client.GetQueueStatus(ctx, id, nil, nil, nil)) }},
 		{"ScheduleDream/workspaceID", func(id string) error { return client.ScheduleDream(ctx, id, dream) }},
-		{"SearchWorkspace/workspaceID", func(id string) error { return errorOf(client.SearchWorkspace(ctx, id, search)) }},
+		{"SearchWorkspace/workspaceID", func(id string) error { return errorOf(client.SearchWorkspace(ctx, id, wsSearch)) }},
 		{"WorkspaceChat/workspaceID", func(id string) error { return errorOf(client.WorkspaceChat(ctx, id, chatOptions)) }},
 		{"WorkspaceChatStream/workspaceID", workspaceChatStream},
 	}

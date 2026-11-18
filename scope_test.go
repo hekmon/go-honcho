@@ -893,3 +893,57 @@ func TestScopesNotFound(t *testing.T) {
 		})
 	}
 }
+
+// A ScopeOption is sent as a JSON string for one scope and as a JSON array for a union, even a union
+// of a single name, as the server reads the two differently. A union of no names and the zero value
+// are sent as an empty array, never as null, for the server to refuse them, and this holds whether
+// the option is marshalled by value or through a pointer.
+func TestScopeOptionMarshalJSON(t *testing.T) {
+	tests := []struct {
+		name   string
+		option any
+		want   string
+	}{
+		{name: "one scope", option: OneScope("team"), want: `"team"`},
+		{name: "one scope by value", option: *OneScope("team"), want: `"team"`},
+		{name: "one scope with an empty name", option: OneScope(""), want: `""`},
+		{name: "one scope needing escaping", option: OneScope(`te"am`), want: `"te\"am"`},
+		{name: "union of two scopes", option: ScopeUnion("team", "music"), want: `["team","music"]`},
+		{name: "union of two scopes by value", option: *ScopeUnion("team", "music"), want: `["team","music"]`},
+		{name: "union of one scope", option: ScopeUnion("team"), want: `["team"]`},
+		{name: "union of no names", option: ScopeUnion(), want: `[]`},
+		{name: "union of no names by value", option: *ScopeUnion(), want: `[]`},
+		{name: "union of a nil list", option: ScopeUnion([]string(nil)...), want: `[]`},
+		{name: "union of an empty list", option: ScopeUnion([]string{}...), want: `[]`},
+		{name: "zero value", option: ScopeOption{}, want: `[]`},
+		{name: "pointer to the zero value", option: &ScopeOption{}, want: `[]`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := json.Marshal(tt.option)
+			if err != nil {
+				t.Fatalf("json.Marshal() error = %v", err)
+			}
+			if string(got) != tt.want {
+				t.Errorf("json.Marshal() = %s, want %s", got, tt.want)
+			}
+		})
+	}
+}
+
+// A union sends the names it was built with, whatever happens afterwards to the list the caller
+// gave it: the restriction cannot change once built.
+func TestScopeUnionKeepsItsNames(t *testing.T) {
+	names := []string{"team", "music"}
+	option := ScopeUnion(names...)
+
+	names[0] = "everyone"
+
+	got, err := json.Marshal(option)
+	if err != nil {
+		t.Fatalf("json.Marshal() error = %v", err)
+	}
+	if want := `["team","music"]`; string(got) != want {
+		t.Errorf("json.Marshal() = %s, want %s", got, want)
+	}
+}

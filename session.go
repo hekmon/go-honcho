@@ -297,6 +297,9 @@ func (c *Client) RemovePeersFromSession(ctx context.Context, workspaceID, sessio
 // Note that the summary will usually take up less space than this. If the caller does not want a summary,
 // we allocate all the tokens to recent messages.
 //
+// Scope reads the representation and peer card of PeerTarget from a scope, and Sessions confines them to
+// an allowlist of sessions. A non-nil empty Sessions is refused before anything is sent.
+//
 // https://docs.honcho.dev/v3/api-reference/endpoint/sessions/get-session-context
 func (c *Client) GetSessionContext(ctx context.Context, workspaceID, sessionID string, opts *GetSessionContextOptions) (result *SessionContext, err error) {
 	if workspaceID == "" {
@@ -305,6 +308,12 @@ func (c *Client) GetSessionContext(ctx context.Context, workspaceID, sessionID s
 	}
 	if sessionID == "" {
 		err = errors.New("sessionID is required")
+		return
+	}
+	// A non-nil empty allowlist would send no sessions parameter at all, silently turning a
+	// restriction the caller asked for into unrestricted recall.
+	if opts != nil && opts.Sessions != nil && len(opts.Sessions) == 0 {
+		err = errors.New("sessions must hold at least one session: leave it nil for no restriction")
 		return
 	}
 	requestURL, err := c.endpoint(workspaceBaseURI, workspaceID, "sessions", sessionID, "context")
@@ -342,6 +351,12 @@ func (c *Client) GetSessionContext(ctx context.Context, workspaceID, sessionID s
 		}
 		if opts.MaxConclusions != nil {
 			query.Set("max_conclusions", strconv.Itoa(*opts.MaxConclusions))
+		}
+		if opts.Scope != nil {
+			query.Set("scope", *opts.Scope)
+		}
+		for _, session := range opts.Sessions {
+			query.Add("sessions", session)
 		}
 		requestURL.RawQuery = query.Encode()
 	}

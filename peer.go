@@ -113,6 +113,9 @@ func (c *Client) UpdatePeer(ctx context.Context, workspaceID, peerID string, req
 // If a target is provided, we get the Representation of the target from the perspective of the Peer.
 // If no target is provided, we get the omniscient Honcho Representation of the Peer.
 //
+// Filters confines the Representation to an allowlist of sessions, and Scope to a scope or a union of
+// scopes: see ScopeOption. A non-nil empty Filters is refused before anything is sent.
+//
 // https://docs.honcho.dev/v3/api-reference/endpoint/peers/get-representation
 func (c *Client) GetRepresentation(ctx context.Context, workspaceID, peerID string, req PeerRepresentationGet) (result *RepresentationResponse, err error) {
 	if workspaceID == "" {
@@ -121,6 +124,9 @@ func (c *Client) GetRepresentation(ctx context.Context, workspaceID, peerID stri
 	}
 	if peerID == "" {
 		err = errors.New("peerID is required")
+		return
+	}
+	if err = req.Validate(); err != nil {
 		return
 	}
 	requestURL, err := c.endpoint(workspaceBaseURI, workspaceID, "peers", peerID, "representation")
@@ -340,6 +346,9 @@ func (c *Client) SearchPeer(ctx context.Context, workspaceID, peerID string, req
 //
 // Performs agentic search and reasoning to comprehensively answer the query based on
 // all latent knowledge gathered about the peer from their messages and conclusions.
+//
+// Filters restricts recall to an allowlist of sessions, and Scope to a scope or a union of
+// scopes: see ScopeOption. A non-nil empty Filters is refused before anything is sent.
 //
 // Chat reads the whole answer at once and refuses a request with Stream set: use
 // ChatStream to read the answer as it is generated.

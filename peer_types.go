@@ -91,6 +91,20 @@ type PeerUpdate struct {
 type PeerRepresentationGet struct {
 	// SessionID is optional session ID within which to scope the representation
 	SessionID *string `json:"session_id,omitempty"`
+	// Filters is an optional allowlist confining the representation to some sessions (nil for no
+	// restriction). It supports only the session_id key: a session ID, a list of session IDs, or
+	// {"in": [...]}, an empty list selecting nothing. The server answers any other key with a 422. An
+	// empty non-nil map is refused by Validate, as it would be left out of the request and turn into
+	// an unrestricted representation. When SessionID is also set, it must be in the allowlist.
+	// Mutually exclusive with Scope
+	Filters map[string]any `json:"filters,omitempty"`
+	// Scope is an optional scope or union of scopes confining the representation (nil for no
+	// restriction), built with OneScope or ScopeUnion. OneScope reads the scope's own representation
+	// of the target peer, formed only from the scope's member sessions, while ScopeUnion restricts the
+	// representation to conclusions from the union of the scopes' member sessions: see ScopeOption.
+	// The server answers an unknown scope with a 404. Mutually exclusive with Filters and SessionID.
+	// Requires a workspace- or admin-level key
+	Scope *ScopeOption `json:"scope,omitempty"`
 	// Target is optional peer ID to get the representation for, from the perspective of this peer
 	Target *string `json:"target,omitempty"`
 	// SearchQuery is optional input to curate the representation around semantic search results
@@ -103,6 +117,16 @@ type PeerRepresentationGet struct {
 	IncludeMostFrequent *bool `json:"include_most_frequent"`
 	// MaxConclusions is only used if SearchQuery is provided. Maximum number of conclusions to include (1-100, default: 25)
 	MaxConclusions *int `json:"max_conclusions,omitempty"`
+}
+
+// Validate checks that the restrictions asked for can be sent
+func (req PeerRepresentationGet) Validate() error {
+	// A non-nil empty filter map would silently be left out of the request by omitempty, turning a
+	// restriction the caller asked for into an unrestricted representation.
+	if req.Filters != nil && len(req.Filters) == 0 {
+		return errors.New("filters must hold at least one filter: leave it nil for no restriction")
+	}
+	return nil
 }
 
 // RepresentationResponse represents the response for getting a peer's representation
@@ -201,6 +225,19 @@ const (
 type DialecticOptions struct {
 	// SessionID is ID of the session to scope the representation to
 	SessionID *string `json:"session_id,omitempty"`
+	// Filters is an optional allowlist restricting recall (conclusions and messages) to some sessions
+	// (nil for no restriction). It supports only the session_id key: a session ID, a list of session
+	// IDs, or {"in": [...]}, an empty list recalling nothing. The server answers any other key with a
+	// 422. An empty non-nil map is refused by Validate, as it would be left out of the request and
+	// turn into unrestricted recall. When SessionID is also set, it must be in the allowlist. Mutually
+	// exclusive with Scope
+	Filters map[string]any `json:"filters,omitempty"`
+	// Scope is an optional scope or union of scopes confining recall (nil for no restriction), built
+	// with OneScope or ScopeUnion. OneScope answers from the scope's own representation of the target
+	// peer, while ScopeUnion restricts recall to the union of the scopes' member sessions: see
+	// ScopeOption. The server answers an unknown scope with a 404. Mutually exclusive with Filters and
+	// SessionID. Requires a workspace- or admin-level key
+	Scope *ScopeOption `json:"scope,omitempty"`
 	// Target is optional peer to get the representation for, from the perspective of this peer
 	Target *string `json:"target,omitempty"`
 	// Query is the dialectic API prompt (1-10000 characters)
@@ -218,6 +255,11 @@ func (req DialecticOptions) Validate() error {
 	}
 	if utf8.RuneCountInString(req.Query) > 10000 {
 		return errors.New("query must be 10000 characters or less")
+	}
+	// A non-nil empty filter map would silently be left out of the request by omitempty, turning a
+	// restriction the caller asked for into unrestricted recall.
+	if req.Filters != nil && len(req.Filters) == 0 {
+		return errors.New("filters must hold at least one filter: leave it nil for no restriction")
 	}
 	return nil
 }

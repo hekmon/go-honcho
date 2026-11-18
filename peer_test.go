@@ -549,6 +549,130 @@ func TestChatNotStreamed(t *testing.T) {
 	}
 }
 
+// recallQuery is the query the tests of the recall restrictions send.
+const recallQuery = "What is my cat's name?"
+
+// recallRoutes are the routes restricting what they recall with a scope and filters.
+var recallRoutes = []struct {
+	name, path string
+	// response is what the server answers the route with
+	response string
+	// unrestricted is the body the route sends without any restriction, less its closing brace
+	unrestricted string
+	// call sends a request with the given restrictions and returns its error
+	call func(ctx context.Context, client *Client, scope *ScopeOption, filters map[string]any) error
+}{
+	{
+		name:         "Chat",
+		path:         "/v3/workspaces/workspace/peers/alice/chat",
+		response:     `{"content":"Your cat's name is **Marzipan**."}`,
+		unrestricted: `{"query":"What is my cat's name?"`,
+		call: func(ctx context.Context, client *Client, scope *ScopeOption, filters map[string]any) error {
+			_, err := client.Chat(ctx, "workspace", "alice", DialecticOptions{Query: recallQuery, Scope: scope, Filters: filters})
+			return err
+		},
+	},
+	{
+		name:         "ChatStream",
+		path:         "/v3/workspaces/workspace/peers/alice/chat",
+		response:     deltaFrame("Marzipan") + finalFrame,
+		unrestricted: `{"query":"What is my cat's name?","stream":true`,
+		call: func(ctx context.Context, client *Client, scope *ScopeOption, filters map[string]any) error {
+			for _, err := range client.ChatStream(ctx, "workspace", "alice", DialecticOptions{Query: recallQuery, Scope: scope, Filters: filters}) {
+				if err != nil {
+					return err
+				}
+			}
+			return nil
+		},
+	},
+	{
+		name:         "GetRepresentation",
+		path:         "/v3/workspaces/workspace/peers/alice/representation",
+		response:     `{"representation":"alice has a cat named Marzipan."}`,
+		unrestricted: `{"include_most_frequent":null`,
+		call: func(ctx context.Context, client *Client, scope *ScopeOption, filters map[string]any) error {
+			_, err := client.GetRepresentation(ctx, "workspace", "alice", PeerRepresentationGet{Scope: scope, Filters: filters})
+			return err
+		},
+	},
+}
+
+// Chat, ChatStream and GetRepresentation send the scope and the filters they are given in the request
+// body, and leave them out when they are not set. One scope is sent as a string and a union as an
+// array, even of a single name, as the server reads the two differently. A filter allowing no session
+// and a union of no names are sent too, and so are a scope and filters together: what they recall, or
+// refusing them, is up to the server.
+func TestRecallRestrictionsRequest(t *testing.T) {
+	sessions := map[string]any{"session_id": []string{"s1", "s2"}}
+	tests := []struct {
+		name    string
+		scope   *ScopeOption
+		filters map[string]any
+		// wantFields is what the restriction adds to the request body
+		wantFields string
+	}{
+		{name: "no restriction"},
+		{name: "one scope", scope: OneScope("team"), wantFields: `,"scope":"team"`},
+		{name: "union of two scopes", scope: ScopeUnion("team", "music"), wantFields: `,"scope":["team","music"]`},
+		{name: "union of one scope", scope: ScopeUnion("team"), wantFields: `,"scope":["team"]`},
+		{name: "union of no names", scope: ScopeUnion(), wantFields: `,"scope":[]`},
+		{name: "zero value scope", scope: &ScopeOption{}, wantFields: `,"scope":[]`},
+		{name: "filter on one session", filters: map[string]any{"session_id": "s2"}, wantFields: `,"filters":{"session_id":"s2"}`},
+		{name: "filter on a list of sessions", filters: sessions, wantFields: `,"filters":{"session_id":["s1","s2"]}`},
+		{
+			name:       "filter with the in operator",
+			filters:    map[string]any{"session_id": map[string]any{"in": []string{"s1"}}},
+			wantFields: `,"filters":{"session_id":{"in":["s1"]}}`,
+		},
+		{name: "filter allowing no session", filters: map[string]any{"session_id": []string{}}, wantFields: `,"filters":{"session_id":[]}`},
+		{name: "scope and filters", scope: OneScope("team"), filters: sessions, wantFields: `,"scope":"team","filters":{"session_id":["s1","s2"]}`},
+	}
+	for _, route := range recallRoutes {
+		for _, tt := range tests {
+			t.Run(route.name+"/"+tt.name, func(t *testing.T) {
+				client, received := scopeServer(t, http.StatusOK, route.response)
+
+				if err := route.call(t.Context(), client, tt.scope, tt.filters); err != nil {
+					t.Fatalf("%s: %v", route.name, err)
+				}
+
+				checkScopeRequest(t, received(), http.MethodPost, route.path, url.Values{}, route.unrestricted+tt.wantFields+`}`)
+			})
+		}
+	}
+}
+
+// Chat, ChatStream and GetRepresentation refuse a non-nil empty Filters before sending anything: it
+// would be left out of the request, turning a restriction the caller asked for into unrestricted
+// recall. Nil Filters ask for no restriction and are accepted.
+func TestRecallRefusesEmptyFilters(t *testing.T) {
+	for _, route := range recallRoutes {
+		t.Run(route.name+"/empty filters", func(t *testing.T) {
+			client, received := scopeServer(t, http.StatusOK, route.response)
+
+			err := route.call(t.Context(), client, nil, map[string]any{})
+
+			if want := "filters must hold at least one filter: leave it nil for no restriction"; err == nil || err.Error() != want {
+				t.Errorf("error = %v, want %q", err, want)
+			}
+			if requests := received(); len(requests) != 0 {
+				t.Errorf("%d requests sent, want none", len(requests))
+			}
+		})
+		t.Run(route.name+"/nil filters", func(t *testing.T) {
+			client, received := scopeServer(t, http.StatusOK, route.response)
+
+			if err := route.call(t.Context(), client, nil, nil); err != nil {
+				t.Errorf("error = %v, want nil", err)
+			}
+			if requests := received(); len(requests) != 1 {
+				t.Errorf("%d requests sent, want 1", len(requests))
+			}
+		})
+	}
+}
+
 // GetAllPeers sends reverse=true when Reverse is set and the kind in the body when Kind is
 // set. Left unset, neither is sent, so the server applies its defaults: oldest peer first,
 // and regular peers only.

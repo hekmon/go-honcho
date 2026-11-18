@@ -169,7 +169,7 @@ grep "type Peer" peer_types.go  # Should find Peer*, PagePeer, etc.
 grep "type Peer" peer.go        # Should find nothing
 ```
 
-**Shared types:** If a type is used by multiple categories (e.g., `MessageSearchOptions` for both workspace and session search), place it in the **primary category** where it's defined in the API docs, or create a `shared_types.go` if used across 3+ categories.
+**Shared types:** If a type is used by multiple categories (e.g., `MessageSearchOptions` for both peer and session search), place it in the **primary category** where it's defined in the API docs, or create a `shared_types.go` if used across 3+ categories.
 
 **❌ Don't leave types in the wrong category file even if they're related** - Sessions and Peers are related but their types belong in separate files.
 
@@ -596,7 +596,7 @@ func (c *Client) GetSessions(workspaceID string, opts *GetSessionsOptions) (resu
 
 ```go
 // ✅ Combine query parameters with request body
-func (c *Client) SearchMessages(workspaceID string, req MessageSearchOptions, opts *SearchOptions) (result *MessageSearchResult, err error) {
+func (c *Client) SearchMessages(workspaceID string, req WorkspaceMessageSearchOptions, opts *SearchOptions) (result *MessageSearchResult, err error) {
     if err = req.Validate(); err != nil {
         return
     }

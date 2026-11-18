@@ -202,3 +202,150 @@ func TestSessionScopes(t *testing.T) {
 		})
 	}
 }
+
+// sessionContextJSON is a session context in the shape of upstream's SessionContext schema.
+const sessionContextJSON = `{"id":"session","messages":[]}`
+
+// GetSessionContext sends the scope, and one sessions parameter per entry, in the query of a GET
+// request without a body. What is left unset is not sent. A scope and sessions together, or without
+// a target, are sent as they are: refusing them is up to the server.
+func TestGetSessionContextRestrictions(t *testing.T) {
+	scope, emptyScope, target := "team", "", "alice"
+	tests := []struct {
+		name      string
+		opts      *GetSessionContextOptions
+		wantQuery url.Values
+	}{
+		{name: "nil options", wantQuery: url.Values{}},
+		{name: "empty options", opts: &GetSessionContextOptions{}, wantQuery: url.Values{}},
+		{
+			name:      "scope",
+			opts:      &GetSessionContextOptions{PeerTarget: &target, Scope: &scope},
+			wantQuery: url.Values{"peer_target": {"alice"}, "scope": {"team"}},
+		},
+		{
+			name:      "empty scope name",
+			opts:      &GetSessionContextOptions{PeerTarget: &target, Scope: &emptyScope},
+			wantQuery: url.Values{"peer_target": {"alice"}, "scope": {""}},
+		},
+		{
+			name:      "one session",
+			opts:      &GetSessionContextOptions{PeerTarget: &target, Sessions: []string{"session"}},
+			wantQuery: url.Values{"peer_target": {"alice"}, "sessions": {"session"}},
+		},
+		{
+			name:      "three sessions",
+			opts:      &GetSessionContextOptions{PeerTarget: &target, Sessions: []string{"session", "s2", "s3"}},
+			wantQuery: url.Values{"peer_target": {"alice"}, "sessions": {"session", "s2", "s3"}},
+		},
+		{
+			name:      "scope and sessions without a target",
+			opts:      &GetSessionContextOptions{Scope: &scope, Sessions: []string{"session"}},
+			wantQuery: url.Values{"scope": {"team"}, "sessions": {"session"}},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client, received := scopeServer(t, http.StatusOK, sessionContextJSON)
+
+			if _, err := client.GetSessionContext(t.Context(), "workspace", "session", tt.opts); err != nil {
+				t.Fatalf("GetSessionContext: %v", err)
+			}
+
+			checkScopeRequest(t, received(), http.MethodGet, "/v3/workspaces/workspace/sessions/session/context", tt.wantQuery, "")
+		})
+	}
+}
+
+// GetSessionContext refuses a non-nil empty Sessions before sending anything: no sessions parameter
+// would be sent, turning the allowlist the caller asked for into unrestricted recall. Nil Sessions
+// ask for no restriction and are accepted.
+func TestGetSessionContextRefusesEmptySessions(t *testing.T) {
+	t.Run("empty sessions", func(t *testing.T) {
+		client, received := scopeServer(t, http.StatusOK, sessionContextJSON)
+
+		result, err := client.GetSessionContext(t.Context(), "workspace", "session", &GetSessionContextOptions{Sessions: []string{}})
+
+		if want := "sessions must hold at least one session: leave it nil for no restriction"; err == nil || err.Error() != want {
+			t.Errorf("error = %v, want %q", err, want)
+		}
+		if result != nil {
+			t.Errorf("result = %+v, want nil", result)
+		}
+		if requests := received(); len(requests) != 0 {
+			t.Errorf("%d requests sent, want none", len(requests))
+		}
+	})
+	t.Run("nil sessions", func(t *testing.T) {
+		client, received := scopeServer(t, http.StatusOK, sessionContextJSON)
+
+		if _, err := client.GetSessionContext(t.Context(), "workspace", "session", &GetSessionContextOptions{}); err != nil {
+			t.Errorf("error = %v, want nil", err)
+		}
+		if requests := received(); len(requests) != 1 {
+			t.Errorf("%d requests sent, want 1", len(requests))
+		}
+	})
+}
+
+// sessionJSON is a session in the shape of upstream's Session schema.
+const sessionJSON = `{"id":"session","is_active":true,"workspace_id":"workspace","created_at":"2026-10-30T00:00:00Z"}`
+
+// GetOrCreateSession sends the names of the scopes to add the session to, and no scopes field when
+// Scopes is not set.
+func TestGetOrCreateSessionScopes(t *testing.T) {
+	tests := []struct {
+		name     string
+		scopes   []string
+		wantBody string
+	}{
+		{name: "no scopes", wantBody: `{"id":"session"}`},
+		{name: "one scope", scopes: []string{"team"}, wantBody: `{"id":"session","scopes":["team"]}`},
+		{name: "two scopes", scopes: []string{"team", "music"}, wantBody: `{"id":"session","scopes":["team","music"]}`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client, received := scopeServer(t, http.StatusOK, sessionJSON)
+
+			if _, err := client.GetOrCreateSession(t.Context(), "workspace", SessionCreate{ID: "session", Scopes: tt.scopes}); err != nil {
+				t.Fatalf("GetOrCreateSession: %v", err)
+			}
+
+			checkScopeRequest(t, received(), http.MethodPost, "/v3/workspaces/workspace/sessions", url.Values{}, tt.wantBody)
+		})
+	}
+}
+
+// A session is created with up to 100 scopes, as upstream allows, and more are refused before
+// anything is sent.
+func TestGetOrCreateSessionScopesLimit(t *testing.T) {
+	scopes := make([]string, 101)
+	for i := range scopes {
+		scopes[i] = fmt.Sprintf("scope-%d", i)
+	}
+	t.Run("100 scopes", func(t *testing.T) {
+		client, received := scopeServer(t, http.StatusOK, sessionJSON)
+
+		if _, err := client.GetOrCreateSession(t.Context(), "workspace", SessionCreate{ID: "session", Scopes: scopes[:100]}); err != nil {
+			t.Fatalf("GetOrCreateSession: %v", err)
+		}
+
+		want, err := json.Marshal(map[string]any{"id": "session", "scopes": scopes[:100]})
+		if err != nil {
+			t.Fatalf("failed to marshal the expected body: %v", err)
+		}
+		checkScopeRequest(t, received(), http.MethodPost, "/v3/workspaces/workspace/sessions", url.Values{}, string(want))
+	})
+	t.Run("101 scopes", func(t *testing.T) {
+		client, received := scopeServer(t, http.StatusOK, sessionJSON)
+
+		_, err := client.GetOrCreateSession(t.Context(), "workspace", SessionCreate{ID: "session", Scopes: scopes})
+
+		if want := "scopes must hold 100 scopes or less"; err == nil || err.Error() != want {
+			t.Errorf("error = %v, want %q", err, want)
+		}
+		if requests := received(); len(requests) != 0 {
+			t.Errorf("%d requests sent, want none", len(requests))
+		}
+	})
+}

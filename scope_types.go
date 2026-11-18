@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"regexp"
+	"slices"
 	"time"
 	"unicode/utf8"
 )
@@ -154,4 +155,52 @@ type ScopeStatus struct {
 	// BackfillStatus maps each session that has had a backfill enqueued to the state of its job.
 	// Empty when no backfill has ever been enqueued for the scope, whatever its member sessions
 	BackfillStatus map[string]ScopeBackfillStatus `json:"backfill_status"`
+}
+
+// ScopeOption restricts what a read route can recall to one scope or to a union of scopes. Build it
+// with OneScope or ScopeUnion, and leave the field holding it nil for no restriction.
+//
+// The two forms mean different things, even for the same single name:
+//   - OneScope is sent as a JSON string. It answers from the scope's own representation of the target
+//     peer: conclusion recall is confined to what the scope observed, and message recall to the
+//     scope's member sessions.
+//   - ScopeUnion is sent as a JSON array. It keeps the peer as the observer and restricts recall to the
+//     union of the scopes' member sessions (explicit allowlist, fail-closed: scopes without any member
+//     session recall nothing).
+//
+// The zero value is a union of no scopes: like ScopeUnion without names, it is sent as an empty array,
+// which the server refuses with a 422, so it can never turn into unrestricted recall.
+type ScopeOption struct {
+	// one is the name of the single scope, nil for a union
+	one *string
+	// union is the names of the scopes of a union
+	union []string
+}
+
+// OneScope returns the option answering from the named scope's own representation of the target peer.
+// This is not what a union of that one name means: see ScopeOption. The server answers a scope that
+// does not exist with a 404, and a scope with no member sessions recalls nothing.
+func OneScope(name string) *ScopeOption {
+	return &ScopeOption{one: &name}
+}
+
+// ScopeUnion returns the option restricting recall to the union of the named scopes' member sessions
+// (1-100 scopes). This is not what OneScope means, even for a single name: see ScopeOption. The server
+// answers a scope that does not exist with a 404 and a union of no names with a 422, and scopes with
+// no member sessions recall nothing.
+func ScopeUnion(names ...string) *ScopeOption {
+	// Cloned so that changing the caller's slice afterwards cannot change the restriction.
+	return &ScopeOption{union: slices.Clone(names)}
+}
+
+// MarshalJSON encodes one scope as a JSON string and a union as a JSON array. A union of no names is
+// encoded as [] and never as null, so that the server refuses it.
+func (option ScopeOption) MarshalJSON() ([]byte, error) {
+	if option.one != nil {
+		return json.Marshal(*option.one)
+	}
+	if option.union == nil {
+		return []byte("[]"), nil
+	}
+	return json.Marshal(option.union)
 }

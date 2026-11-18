@@ -19,6 +19,10 @@ type SessionCreate struct {
 	Peers map[string]*SessionPeerConfig `json:"peers,omitempty"`
 	// Configuration is optional session-level configuration
 	Configuration *SessionConfiguration `json:"configuration,omitempty"`
+	// Scopes is the optional names of the scopes to add this session to (maximum: 100), even if the
+	// session already exists. A scope that does not exist is created. If the session already has
+	// messages, its existing documents are backfilled into the scope asynchronously
+	Scopes []string `json:"scopes,omitempty"`
 }
 
 // Validate checks that mandatory fields are valid
@@ -31,6 +35,9 @@ func (req SessionCreate) Validate() error {
 	}
 	if !sessionIDPattern.MatchString(req.ID) {
 		return errors.New("id must contain only letters, numbers, underscores, or hyphens")
+	}
+	if len(req.Scopes) > 100 {
+		return errors.New("scopes must hold 100 scopes or less")
 	}
 	return nil
 }
@@ -171,6 +178,19 @@ type GetSessionContextOptions struct {
 	IncludeMostFrequent *bool
 	// MaxConclusions is only used if SearchQuery is provided (1-100)
 	MaxConclusions *int
+	// Scope is the name of a scope to use as the perspective source (optional, nil for none): the
+	// representation and peer card of PeerTarget are read from the scope's observations instead of the
+	// global (or PeerPerspective) view. It requires PeerTarget and excludes PeerPerspective and Sessions,
+	// which the server reports with a 422. Requires a workspace- or admin-level key
+	Scope *string
+	// Sessions is an optional allowlist of session IDs confining the representation of PeerTarget to
+	// those sessions (nil for no restriction). Recall is restricted to conclusions stated directly in
+	// the allowed sessions, and the peer card is omitted. It requires PeerTarget, must include this
+	// session and excludes Scope and LimitToSession, which the server reports with a 422. An empty
+	// non-nil list is refused by GetSessionContext, as no parameter would be sent and the restriction
+	// would be lost. Each entry is sent as its own parameter, so a list of a few hundred sessions can
+	// exceed what the server accepts in a request line: use Scope for large or reusable session sets
+	Sessions []string
 }
 
 // GetSessionPeersOptions represents optional parameters for GetSessionPeers

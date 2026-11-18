@@ -171,6 +171,41 @@ func TestValidateSearchLimit(t *testing.T) {
 	})
 }
 
+// A workspace search follows the rules of the other message searches: the query is required, and a
+// limit of 0 is accepted while any other limit must be between 1 and 100. The scope and the filters
+// are left to the server.
+func TestValidateWorkspaceSearch(t *testing.T) {
+	scope := ""
+	tests := []struct {
+		name    string
+		request WorkspaceMessageSearchOptions
+		errMsg  string
+	}{
+		{name: "limit 0", request: WorkspaceMessageSearchOptions{Query: "q"}},
+		{name: "limit 1", request: WorkspaceMessageSearchOptions{Query: "q", Limit: 1}},
+		{name: "limit 100", request: WorkspaceMessageSearchOptions{Query: "q", Limit: 100}},
+		{name: "limit -1", request: WorkspaceMessageSearchOptions{Query: "q", Limit: -1}, errMsg: "limit must be between 1 and 100"},
+		{name: "limit 101", request: WorkspaceMessageSearchOptions{Query: "q", Limit: 101}, errMsg: "limit must be between 1 and 100"},
+		{name: "empty query", request: WorkspaceMessageSearchOptions{}, errMsg: "query is required"},
+		{name: "empty scope name", request: WorkspaceMessageSearchOptions{Query: "q", Scope: &scope}},
+		{name: "empty filters", request: WorkspaceMessageSearchOptions{Query: "q", Filters: map[string]any{}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.request.Validate()
+			if tt.errMsg == "" {
+				if err != nil {
+					t.Errorf("Validate() error = %v, want nil", err)
+				}
+				return
+			}
+			if err == nil || err.Error() != tt.errMsg {
+				t.Errorf("Validate() error = %v, want %q", err, tt.errMsg)
+			}
+		})
+	}
+}
+
 // A peer card may be an empty list, which upstream takes as clearing the card, and
 // is sent as an empty list. A nil card stays refused, as it would be sent as null
 // and upstream refuses null. Regression test: Validate refused an empty card, so a

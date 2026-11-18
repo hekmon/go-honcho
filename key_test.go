@@ -67,3 +67,54 @@ func TestCreateKey(t *testing.T) {
 		t.Errorf("marshalled key = %s, want %s", data, wantJSON)
 	}
 }
+
+// CreateKey sends the name of a named scope as scope_id, and no scope_id at all when ScopeID is nil.
+func TestCreateKeyScopeID(t *testing.T) {
+	scope := "team"
+	tests := []struct {
+		name      string
+		req       CreateKeyRequest
+		wantQuery url.Values
+	}{
+		{
+			name:      "named scope",
+			req:       CreateKeyRequest{WorkspaceID: "workspace", ScopeID: &scope},
+			wantQuery: url.Values{"workspace_id": {"workspace"}, "scope_id": {"team"}},
+		},
+		{
+			name:      "nil scope ID",
+			req:       CreateKeyRequest{WorkspaceID: "workspace"},
+			wantQuery: url.Values{"workspace_id": {"workspace"}},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client, received := scopeServer(t, http.StatusOK, `{"key":"token"}`)
+
+			if _, err := client.CreateKey(t.Context(), tt.req); err != nil {
+				t.Fatalf("CreateKey: %v", err)
+			}
+
+			checkScopeRequest(t, received(), http.MethodPost, "/v3/keys", tt.wantQuery, "")
+		})
+	}
+}
+
+// CreateKey refuses a non-nil empty ScopeID before sending anything: leaving it out of the request
+// would mint a workspace-wide key instead of the restricted one the caller asked for.
+func TestCreateKeyRefusesEmptyScopeID(t *testing.T) {
+	client, received := scopeServer(t, http.StatusOK, `{"key":"token"}`)
+	scope := ""
+
+	key, err := client.CreateKey(t.Context(), CreateKeyRequest{WorkspaceID: "workspace", ScopeID: &scope})
+
+	if want := "scope_id must not be empty: leave it nil for a key not tied to a named scope"; err == nil || err.Error() != want {
+		t.Errorf("error = %v, want %q", err, want)
+	}
+	if key != nil {
+		t.Errorf("key = %+v, want nil", key)
+	}
+	if requests := received(); len(requests) != 0 {
+		t.Errorf("%d requests sent, want none", len(requests))
+	}
+}

@@ -188,8 +188,11 @@ func (c *Client) ScheduleDream(ctx context.Context, workspaceID string, req Sche
 
 // SearchWorkspace searches messages in a Workspace using optional filters.
 //
+// Set Scope to restrict the search to a scope's member sessions: a scope with no member sessions
+// returns no results.
+//
 // https://docs.honcho.dev/v3/api-reference/endpoint/workspaces/search-workspace
-func (c *Client) SearchWorkspace(ctx context.Context, workspaceID string, req MessageSearchOptions) (result *[]Message, err error) {
+func (c *Client) SearchWorkspace(ctx context.Context, workspaceID string, req WorkspaceMessageSearchOptions) (result *[]Message, err error) {
 	if workspaceID == "" {
 		err = errors.New("workspaceID is required")
 		return

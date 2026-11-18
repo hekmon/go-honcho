@@ -648,3 +648,45 @@ func TestGetAllWorkspacesReverse(t *testing.T) {
 		})
 	}
 }
+
+// SearchWorkspace sends a POST request to the workspace's search path with the fields set in the
+// request. The scope is sent when it is set, an empty name included, and left out otherwise. A scope
+// with a session_id filter is sent as it is: refusing it is up to the server.
+func TestSearchWorkspaceRequest(t *testing.T) {
+	scope, emptyScope := "team", ""
+	tests := []struct {
+		name     string
+		req      WorkspaceMessageSearchOptions
+		wantBody string
+	}{
+		{name: "query only", req: WorkspaceMessageSearchOptions{Query: "cats"}, wantBody: `{"query":"cats"}`},
+		{name: "scope", req: WorkspaceMessageSearchOptions{Query: "cats", Scope: &scope}, wantBody: `{"query":"cats","scope":"team"}`},
+		{name: "empty scope name", req: WorkspaceMessageSearchOptions{Query: "cats", Scope: &emptyScope}, wantBody: `{"query":"cats","scope":""}`},
+		{
+			name: "every field",
+			req: WorkspaceMessageSearchOptions{
+				Query:   "cats",
+				Filters: map[string]any{"peer_id": "alice"},
+				Limit:   5,
+				Scope:   &scope,
+			},
+			wantBody: `{"query":"cats","filters":{"peer_id":"alice"},"limit":5,"scope":"team"}`,
+		},
+		{
+			name:     "scope and a session_id filter",
+			req:      WorkspaceMessageSearchOptions{Query: "cats", Filters: map[string]any{"session_id": "s1"}, Scope: &scope},
+			wantBody: `{"query":"cats","filters":{"session_id":"s1"},"scope":"team"}`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client, received := scopeServer(t, http.StatusOK, `[]`)
+
+			if _, err := client.SearchWorkspace(t.Context(), "workspace", tt.req); err != nil {
+				t.Fatalf("SearchWorkspace: %v", err)
+			}
+
+			checkScopeRequest(t, received(), http.MethodPost, "/v3/workspaces/workspace/search", url.Values{}, tt.wantBody)
+		})
+	}
+}
