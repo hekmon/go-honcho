@@ -1,6 +1,7 @@
 package honcho
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 )
@@ -125,4 +126,47 @@ func TestValidateEmptyContent(t *testing.T) {
 			}
 		})
 	}
+}
+
+// A search limit of 0 is accepted and left out of the request, so the server
+// applies its default of 10, since upstream refuses an explicit 0. Any other limit
+// must be between 1 and 100, and the query stays required. Regression test:
+// Validate refused a limit of 0, so a search that did not set a limit never
+// reached the server.
+func TestValidateSearchLimit(t *testing.T) {
+	tests := []struct {
+		name    string
+		request MessageSearchOptions
+		errMsg  string
+	}{
+		{name: "limit 0", request: MessageSearchOptions{Query: "q"}},
+		{name: "limit 1", request: MessageSearchOptions{Query: "q", Limit: 1}},
+		{name: "limit 100", request: MessageSearchOptions{Query: "q", Limit: 100}},
+		{name: "limit -1", request: MessageSearchOptions{Query: "q", Limit: -1}, errMsg: "limit must be between 1 and 100"},
+		{name: "limit 101", request: MessageSearchOptions{Query: "q", Limit: 101}, errMsg: "limit must be between 1 and 100"},
+		{name: "empty query", request: MessageSearchOptions{}, errMsg: "query is required"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.request.Validate()
+			if tt.errMsg == "" {
+				if err != nil {
+					t.Errorf("Validate() error = %v, want nil", err)
+				}
+				return
+			}
+			if err == nil || err.Error() != tt.errMsg {
+				t.Errorf("Validate() error = %v, want %q", err, tt.errMsg)
+			}
+		})
+	}
+	t.Run("limit 0 is left out of the request", func(t *testing.T) {
+		body, err := json.Marshal(MessageSearchOptions{Query: "q"})
+		if err != nil {
+			t.Fatalf("json.Marshal() error = %v", err)
+		}
+		if strings.Contains(string(body), `"limit"`) {
+			t.Errorf("json.Marshal() = %s, want no limit field", body)
+		}
+	})
 }

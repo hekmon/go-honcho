@@ -1117,7 +1117,7 @@ func (req MessageSearchOptions) Validate() error {
     if req.Query == "" {
         return errors.New("query is required")
     }
-    if req.Limit < 1 || req.Limit > 100 {  // exact min/max from spec
+    if req.Limit != 0 && (req.Limit < 1 || req.Limit > 100) {  // exact min/max from spec, 0 means "use default"
         return errors.New("limit must be between 1 and 100")
     }
     return nil
@@ -1125,8 +1125,8 @@ func (req MessageSearchOptions) Validate() error {
 
 // ❌ Don't approximate or assume
 func (req MessageSearchOptions) Validate() error {
-    if req.Limit < 0 || req.Limit > 100 {  // wrong minimum!
-        return errors.New("limit must be between 0 and 100")
+    if req.Limit != 0 && (req.Limit < 1 || req.Limit > 1000) {  // wrong maximum!
+        return errors.New("limit must be between 1 and 1000")
     }
     return nil
 }
