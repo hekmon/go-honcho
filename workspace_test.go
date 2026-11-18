@@ -522,3 +522,100 @@ func TestWorkspaceChatNotFound(t *testing.T) {
 		})
 	}
 }
+
+// GetOrCreateWorkspace, GetOrCreatePeer and GetOrCreateSession decode the immutable uid
+// Honcho generates for the resource, from the answers of a real Honcho server.
+func TestResourceUID(t *testing.T) {
+	tests := []struct {
+		name     string
+		response string
+		want     string
+		get      func(t *testing.T, client *Client) (uid string, err error)
+	}{
+		{
+			name:     "GetOrCreateWorkspace",
+			response: `{"id":"w","uid":"46xqSOtyM08WIPPJQM5_6","metadata":{},"configuration":{},"created_at":"2026-11-18T16:09:28.620049Z"}`,
+			want:     "46xqSOtyM08WIPPJQM5_6",
+			get: func(t *testing.T, client *Client) (uid string, err error) {
+				workspace, err := client.GetOrCreateWorkspace(t.Context(), CreateWorkspaceRequest{ID: "w"})
+				if err != nil {
+					return
+				}
+				uid = workspace.UID
+				return
+			},
+		},
+		{
+			name:     "GetOrCreatePeer",
+			response: `{"id":"alice","uid":"yTkg0JNCYKPlmpuCQAfqn","workspace_id":"w","created_at":"2026-11-18T16:09:28.620049Z","metadata":{},"configuration":{}}`,
+			want:     "yTkg0JNCYKPlmpuCQAfqn",
+			get: func(t *testing.T, client *Client) (uid string, err error) {
+				peer, err := client.GetOrCreatePeer(t.Context(), "w", PeerCreate{ID: "alice"})
+				if err != nil {
+					return
+				}
+				uid = peer.UID
+				return
+			},
+		},
+		{
+			name:     "GetOrCreateSession",
+			response: `{"id":"s1","uid":"X7i6McQJTWP_F1wFzG3E2","is_active":true,"workspace_id":"w","metadata":{},"configuration":{},"created_at":"2026-11-18T16:09:28.620049Z"}`,
+			want:     "X7i6McQJTWP_F1wFzG3E2",
+			get: func(t *testing.T, client *Client) (uid string, err error) {
+				session, err := client.GetOrCreateSession(t.Context(), "w", SessionCreate{ID: "s1"})
+				if err != nil {
+					return
+				}
+				uid = session.UID
+				return
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client, _ := scopeServer(t, http.StatusOK, tt.response)
+
+			uid, err := tt.get(t, client)
+			if err != nil {
+				t.Fatalf("%s: %v", tt.name, err)
+			}
+
+			if uid != tt.want {
+				t.Errorf("UID = %q, want %q", uid, tt.want)
+			}
+		})
+	}
+}
+
+// ScheduleDream sends rebuild as true when Rebuild is set, and otherwise leaves it out of
+// the body, so the server applies its default.
+func TestScheduleDreamRebuild(t *testing.T) {
+	tests := []struct {
+		name string
+		req  ScheduleDreamRequest
+		want string
+	}{
+		{
+			name: "rebuild set",
+			req:  ScheduleDreamRequest{Observer: "alice", DreamType: DreamTypeCardRefresh, Rebuild: true},
+			want: `{"observer":"alice","dream_type":"card_refresh","rebuild":true}`,
+		},
+		{
+			name: "rebuild not set",
+			req:  ScheduleDreamRequest{Observer: "alice", DreamType: DreamTypeCardRefresh},
+			want: `{"observer":"alice","dream_type":"card_refresh"}`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client, received := scopeServer(t, http.StatusNoContent, "")
+
+			if err := client.ScheduleDream(t.Context(), "workspace", tt.req); err != nil {
+				t.Fatalf("ScheduleDream: %v", err)
+			}
+
+			checkScopeRequest(t, received(), http.MethodPost, "/v3/workspaces/workspace/schedule_dream", url.Values{}, tt.want)
+		})
+	}
+}

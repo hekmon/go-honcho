@@ -473,6 +473,7 @@ func TestGetScopeSessionsDecodesPage(t *testing.T) {
 	want := &PageSession{
 		Items: []Session{{
 			ID:            "s1",
+			UID:           "Xv27Pg3BTadRElK_LnbyJ",
 			IsActive:      true,
 			WorkspaceID:   "workspace",
 			Metadata:      json.RawMessage(`{"topic":"support"}`),

@@ -170,7 +170,8 @@ status, err = client.GetQueueStatus("my-workspace", &observerID, nil, &sessionID
 
 // Schedule a dream task
 err = client.ScheduleDream("my-workspace", honcho.ScheduleDreamRequest{
-    CollectionID: "collection-123",
+    Observer:  "user-123",
+    DreamType: honcho.DreamTypeOmni,
 })
 
 // Query the whole workspace in natural language, here within two scopes
