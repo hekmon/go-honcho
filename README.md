@@ -768,7 +768,7 @@ peers := map[string]*honcho.SessionPeerConfig{
 }
 ```
 
-**Note:** Some boolean fields use `bool` with `omitempty` for simplicity (e.g., `Reverse` in pagination options), so you can pass `true` or `false` directly without pointers. However, configuration booleans like `ObserveMe` use `*bool` to support three-state logic (nil = keep existing, true/false = change).
+**Note:** Some boolean fields use `bool` with `omitempty` for simplicity (e.g., `Reverse` in pagination options), so you can pass `true` or `false` directly without pointers. However, configuration booleans like `ObserveMe` use `*bool` to tell unset (nil) apart from an explicit `true` or `false`. What nil does depends on the endpoint: `SetPeerConfig` keeps the stored value, while `UpdatePeer`, `UpdateWorkspace` and a section sent to `UpdateSession` replace what is stored.
 
 ## API Reference
 

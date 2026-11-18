@@ -59,7 +59,7 @@ Endpoint path starts with `/v3/workspaces`?
 **Pointer vs Value type for optional field?**
 ```
 Need to distinguish "not provided" from "zero value"?
-├─ YES → Use pointer (*int, *bool, *string) with omitempty
+├─ YES → Use pointer: *int, *string with omitempty (*bool: see the boolean tree below)
 └─ NO → Use value type (int, bool) with omitempty (0 = use default)
 ```
 
@@ -68,8 +68,8 @@ Need to distinguish "not provided" from "zero value"?
 Is it a boolean field?
 ├─ YES → Is it pagination/filter options (false = server default)?
 │  ├─ YES → Use bool with omitempty (e.g., Reverse bool)
-│  └─ NO → Is it configuration update (need "don't change" option)?
-│     ├─ YES → Use *bool with omitempty (nil = keep existing)
+│  └─ NO → Is it a configuration field (unset must differ from true/false)?
+│     ├─ YES → Use *bool without omitempty, by convention (nil = null, see "Why This Matters")
 │     └─ NO → Use bool with omitempty (false = default)
 └─ NO → Follow pointer vs value decision above
 ```
@@ -180,7 +180,7 @@ grep "type Peer" peer.go        # Should find nothing
 **Use pointer (`*int`, `*bool`, `*string`) when:**
 - You need to distinguish between "not provided" (nil) and "explicitly set to zero value"
 - The field is truly optional with no meaningful default
-- For `*bool`: when you need 3-way logic (nil = "don't change", true = "enable", false = "disable")
+- For `*bool`: when you need to tell unset (nil) apart from an explicit true or false (what a nil does depends on the endpoint, see **Why This Matters** in [Struct Field Documentation](#struct-field-documentation))
 
 ```go
 // ✅ Pointer distinguishes nil vs 0
@@ -188,14 +188,14 @@ type GetPeerContextOptions struct {
     SearchTopK *int `json:"search_top_k,omitempty"`  // nil = not provided, 0 = explicitly zero
 }
 
-// ✅ Pointer for bool when you need 3-way logic (configuration updates)
-// CRITICAL: Do NOT use omitempty with *bool for config fields
-// - nil → sent as JSON null (means "don't change this field")
+// ✅ Pointer for bool when you need to tell unset apart from true or false (configuration fields)
+// Repository convention: declare *bool config fields without omitempty
+// - nil → sent as JSON null (effect depends on the endpoint, see "Why This Matters" in Struct Field Documentation)
 // - true → sent as true (enable)
 // - false → sent as false (disable)
-// With omitempty, false would be omitted, breaking the 3-state logic
+// A *bool can send false with or without omitempty: only nil is omitted
 type SessionPeerConfig struct {
-    ObserveMe *bool `json:"observe_me"`  // nil = null (don't change), true = enable, false = disable
+    ObserveMe *bool `json:"observe_me"`  // nil = null, true = enable, false = disable
 }
 ```
 
@@ -1183,27 +1183,21 @@ type ListConclusionsOptions struct {
     Size int `json:"size,omitempty"`  // 0 = use server default (50)
 }
 
-// ✅ Document when pointer is needed (3-way logic)
-// CRITICAL: Do NOT use omitempty on *bool config fields
-// - nil → sent as JSON null (means "don't change this field")
+// ✅ Document when pointer is needed (unset vs explicit true or false)
+// Repository convention: declare *bool config fields without omitempty
+// - nil → sent as JSON null (effect depends on the endpoint, see "Why This Matters" below)
 // - true → sent as true (enable)
 // - false → sent as false (disable)
-// If you use omitempty, false values will be omitted from JSON, preventing users from disabling features
 type SessionPeerConfig struct {
     // ObserveMe indicates whether to enable observation (optional)
-    ObserveMe *bool `json:"observe_me"`  // nil = null (don't change), true = enable, false = disable
+    ObserveMe *bool `json:"observe_me"`  // nil = null, true = enable, false = disable
     
     // ObserveOthers indicates whether to observe other peers (optional)
-    ObserveOthers *bool `json:"observe_others"`  // nil = null (don't change), true/false = change
+    ObserveOthers *bool `json:"observe_others"`  // nil = null, true = enable, false = disable
 }
 
 // ❌ Avoid ambiguous documentation
 // TopK is the number of results to return (min: 1, max: 100)  // doesn't mention 0!
-
-// ❌ WRONG: Using omitempty with *bool breaks 3-state logic
-type WrongSessionPeerConfig struct {
-    ObserveMe *bool `json:"observe_me,omitempty"`  // WRONG - false is omitted, can't disable!
-}
 ```
 
 This is critical for optional parameters where `0` means "use server default".
@@ -1220,24 +1214,19 @@ type GetMessagesOptions struct {
     Reverse bool `json:"reverse,omitempty"`  // false omitted, true sent
 }
 
-// ✅ Use *bool WITHOUT omitempty for configuration updates (3-way logic)
-// When you need: nil = "don't change", true = "enable", false = "disable"
-// CRITICAL: NO omitempty - it would prevent sending false values
+// ✅ Use *bool for configuration fields: it tells unset apart from an explicit true or false
+// Repository convention: declare it without omitempty, so nil is sent as an explicit null
+// It can send false with or without omitempty: only nil is omitted
 type SessionPeerConfig struct {
     // ObserveMe indicates whether to enable observation (optional)
-    // nil = null in JSON (don't change), true = enable, false = disable
-    ObserveMe *bool `json:"observe_me"`  // NO omitempty!
+    // nil = null in JSON (effect depends on the endpoint, see "Why This Matters" below), true = enable, false = disable
+    ObserveMe *bool `json:"observe_me"`  // no omitempty, by convention
 }
 
 // ✅ Use *bool for optional fields where 0/empty string distinction matters
 type GetPeerContextOptions struct {
     // SearchTopK: nil = not provided, 0 = explicitly zero
-    SearchTopK *int `json:"search_top_k,omitempty"`  // omitempty OK for *int/*string
-}
-
-// ❌ WRONG: *bool with omitempty can't send false
-type WrongConfig struct {
-    ObserveMe *bool `json:"observe_me,omitempty"`  // false is omitted - broken!
+    SearchTopK *int `json:"search_top_k,omitempty"`  // omitempty omits only nil, 0 is still sent
 }
 
 // ❌ WRONG: *bool for simple flags is overkill
@@ -1250,8 +1239,8 @@ type OverkillOptions struct {
 
 ```
 Is the field used in a configuration update (PUT/PATCH)?
-├─ YES → Do you need "don't change" option?
-│  ├─ YES → Use *bool WITHOUT omitempty (nil=null, true/false sent)
+├─ YES → Do you need to tell unset apart from true or false?
+│  ├─ YES → Use *bool without omitempty, by convention (nil=null, true/false sent; see "Why This Matters" below)
 │  │  Example: SessionPeerConfig.ObserveMe
 │  └─ NO → Use bool with omitempty (false=default)
 │     Example: DialecticOptions.Stream
@@ -1266,11 +1255,23 @@ Is the field used in a configuration update (PUT/PATCH)?
 **Why This Matters:**
 
 The Honcho API accepts `anyOf: [boolean, null]` for configuration fields. This means:
-- `null` = keep existing value (don't change this field)
+- `null` = unset (its effect depends on the endpoint, see the table below)
 - `true` = enable this feature
 - `false` = disable this feature
 
-If you use `omitempty` with `*bool`, Go's JSON marshaler omits both `nil` AND `false` values, making it impossible to disable features. Always use `*bool` **without** `omitempty` for configuration fields that support 3-state logic.
+A `*bool` tells unset (`nil`) apart from an explicit `true` or `false`, and it can send `false` with or without `omitempty`: Go's JSON marshaler omits only a `nil` pointer. This repository's convention is to declare configuration `*bool` fields **without** `omitempty`, so a `nil` is sent as an explicit `null`.
+
+What a `nil` does depends on the endpoint:
+
+| Where the field is sent | What `nil` does |
+|-------------------------|-----------------|
+| `SessionPeerConfig` through `SetPeerConfig` | Keeps the stored value, like omitting the field |
+| `SessionPeerConfig` through `AddPeersToSession`, peer already in the session | Whole sent configuration ignored: stored values stay, even for fields sent as `true` or `false` |
+| Workspace configuration through `UpdateWorkspace` | Whole stored configuration replaced: anything not sent is erased |
+| Session configuration through `UpdateSession` | A sent section replaces the stored section of that name, so a `nil` field inside it is erased; sections not sent are kept |
+| `PeerConfig` through `UpdatePeer` | Whole stored configuration replaced: `nil` is stored as `null` |
+
+To change one field of a workspace or session configuration section, send the whole section with its other values. For a workspace, also send the other sections, because `UpdateWorkspace` replaces the whole configuration.
 
 ---
 
