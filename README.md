@@ -418,6 +418,8 @@ page, err = client.ListConclusions("workspace-id", &honcho.ConclusionGet{
 conclusions, err = client.QueryConclusions("workspace-id", honcho.ConclusionQuery{
     Query: "communication preferences",
     TopK:  10,
+    // Required: name the observer (observer or observer_id) and the observed peer (observed or observed_id)
+    Filters: map[string]any{"observer_id": "user-123", "observed_id": "user-456"},
 })
 
 // Delete a conclusion

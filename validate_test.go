@@ -209,3 +209,54 @@ func TestValidatePeerCard(t *testing.T) {
 		}
 	})
 }
+
+// A conclusion query must name both the observer and the observed peer in its
+// filters, as upstream requires. For each side either key may hold the value, and a
+// missing, nil or empty-string value does not count. The query, top_k and distance
+// checks still apply. Regression test: Validate did not check the filters, so a
+// query that did not name both peers was sent and always came back as a 422.
+func TestValidateConclusionQuery(t *testing.T) {
+	const peersErr = "filters must name the observer (observer or observer_id) and the observed peer (observed or observed_id)"
+	peers := map[string]any{"observer": "alice", "observed": "bob"}
+	distance := 1.5
+	tests := []struct {
+		name    string
+		request ConclusionQuery
+		errMsg  string
+	}{
+		{name: "no filters", request: ConclusionQuery{Query: "q"}, errMsg: peersErr},
+		{name: "empty filters", request: ConclusionQuery{Query: "q", Filters: map[string]any{}}, errMsg: peersErr},
+		{name: "observer only", request: ConclusionQuery{Query: "q", Filters: map[string]any{"observer": "alice"}}, errMsg: peersErr},
+		{name: "observed only", request: ConclusionQuery{Query: "q", Filters: map[string]any{"observed": "bob"}}, errMsg: peersErr},
+		{name: "observer and observed", request: ConclusionQuery{Query: "q", Filters: map[string]any{"observer": "alice", "observed": "bob"}}},
+		{name: "observer_id and observed_id", request: ConclusionQuery{Query: "q", Filters: map[string]any{"observer_id": "alice", "observed_id": "bob"}}},
+		{name: "observer and observed_id", request: ConclusionQuery{Query: "q", Filters: map[string]any{"observer": "alice", "observed_id": "bob"}}},
+		{name: "observer_id and observed", request: ConclusionQuery{Query: "q", Filters: map[string]any{"observer_id": "alice", "observed": "bob"}}},
+		{name: "empty observer with observed", request: ConclusionQuery{Query: "q", Filters: map[string]any{"observer": "", "observed": "bob"}}, errMsg: peersErr},
+		{name: "empty observed with observer", request: ConclusionQuery{Query: "q", Filters: map[string]any{"observer": "alice", "observed": ""}}, errMsg: peersErr},
+		{name: "observer and observed plus another filter", request: ConclusionQuery{Query: "q", Filters: map[string]any{"observer": "alice", "observed": "bob", "level": "explicit"}}},
+		{name: "empty observer with non-empty observer_id", request: ConclusionQuery{Query: "q", Filters: map[string]any{"observer": "", "observer_id": "alice", "observed": "bob"}}},
+		{name: "observer with empty observer_id", request: ConclusionQuery{Query: "q", Filters: map[string]any{"observer": "alice", "observer_id": "", "observed": "bob"}}},
+		{name: "empty observed with non-empty observed_id", request: ConclusionQuery{Query: "q", Filters: map[string]any{"observer": "alice", "observed": "", "observed_id": "bob"}}},
+		{name: "nil observer", request: ConclusionQuery{Query: "q", Filters: map[string]any{"observer": nil, "observed": "bob"}}, errMsg: peersErr},
+		{name: "nil observed", request: ConclusionQuery{Query: "q", Filters: map[string]any{"observer": "alice", "observed": nil}}, errMsg: peersErr},
+		{name: "empty query", request: ConclusionQuery{Filters: peers}, errMsg: "query is required"},
+		{name: "empty query without filters", request: ConclusionQuery{}, errMsg: "query is required"},
+		{name: "top_k 101", request: ConclusionQuery{Query: "q", Filters: peers, TopK: 101}, errMsg: "top_k must be between 1 and 100"},
+		{name: "distance 1.5", request: ConclusionQuery{Query: "q", Filters: peers, Distance: &distance}, errMsg: "distance must be between 0 and 1"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.request.Validate()
+			if tt.errMsg == "" {
+				if err != nil {
+					t.Errorf("Validate() error = %v, want nil", err)
+				}
+				return
+			}
+			if err == nil || err.Error() != tt.errMsg {
+				t.Errorf("Validate() error = %v, want %q", err, tt.errMsg)
+			}
+		})
+	}
+}

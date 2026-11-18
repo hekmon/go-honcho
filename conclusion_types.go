@@ -51,7 +51,8 @@ type ConclusionQuery struct {
 	TopK int `json:"top_k,omitempty"`
 	// Distance is the maximum cosine distance threshold for results (optional, 0-1)
 	Distance *float64 `json:"distance,omitempty"`
-	// Filters are additional filters to apply (optional)
+	// Filters are the filters to apply (required). They must name the observer, under
+	// "observer" or "observer_id", and the observed peer, under "observed" or "observed_id".
 	Filters map[string]any `json:"filters,omitempty"`
 }
 

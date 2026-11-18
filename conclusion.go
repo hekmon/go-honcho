@@ -90,6 +90,9 @@ func (c *Client) ListConclusions(ctx context.Context, workspaceID string, req *C
 //
 // Use `top_k` to control the number of results returned.
 //
+// `filters` is required and must name the observer, under `observer` or `observer_id`,
+// and the observed peer, under `observed` or `observed_id`.
+//
 // https://docs.honcho.dev/v3/api-reference/endpoint/conclusions/query-conclusions
 func (c *Client) QueryConclusions(ctx context.Context, workspaceID string, req ConclusionQuery) (result []*Conclusion, err error) {
 	if workspaceID == "" {
@@ -146,6 +149,9 @@ func (req ConclusionQuery) Validate() error {
 	if req.Query == "" {
 		return errors.New("query is required")
 	}
+	if !namesPeer(req.Filters, "observer", "observer_id") || !namesPeer(req.Filters, "observed", "observed_id") {
+		return errors.New("filters must name the observer (observer or observer_id) and the observed peer (observed or observed_id)")
+	}
 	if req.TopK != 0 && (req.TopK < 1 || req.TopK > 100) {
 		return errors.New("top_k must be between 1 and 100")
 	}
@@ -153,4 +159,15 @@ func (req ConclusionQuery) Validate() error {
 		return errors.New("distance must be between 0 and 1")
 	}
 	return nil
+}
+
+// namesPeer reports whether filters holds a value under one of keys. A missing, nil
+// or empty-string value does not count.
+func namesPeer(filters map[string]any, keys ...string) bool {
+	for _, key := range keys {
+		if value := filters[key]; value != nil && value != "" {
+			return true
+		}
+	}
+	return false
 }
