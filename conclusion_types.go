@@ -2,6 +2,16 @@ package honcho
 
 import "time"
 
+// ConclusionLevel represents the reasoning level of a conclusion
+type ConclusionLevel string
+
+const (
+	ConclusionLevelExplicit      ConclusionLevel = "explicit"
+	ConclusionLevelDeductive     ConclusionLevel = "deductive"
+	ConclusionLevelInductive     ConclusionLevel = "inductive"
+	ConclusionLevelContradiction ConclusionLevel = "contradiction"
+)
+
 // Conclusion represents a logical certainty derived from interactions between Peers.
 // Conclusions form the basis of a Peer's Representation.
 type Conclusion struct {
@@ -15,6 +25,19 @@ type Conclusion struct {
 	ObservedID string `json:"observed_id"`
 	// SessionID is the session ID where the conclusion was created (optional)
 	SessionID *string `json:"session_id,omitempty"`
+	// Level is the reasoning level of the conclusion (default: explicit): explicit is directly
+	// extracted from messages, while deductive, inductive and contradiction are derived during dreaming
+	Level ConclusionLevel `json:"level"`
+	// SourceIDs are the IDs of the conclusions this one was derived from: premises for deductive,
+	// supporting sources for inductive, conflicting conclusions for contradiction. Empty for
+	// explicit conclusions, which derive from messages rather than from other conclusions. Never null.
+	SourceIDs []string `json:"source_ids"`
+	// SourceMessageIDs are the IDs of the messages the deriver cited as evidence for an explicit
+	// conclusion, in citation order. Evidence may include messages from peers other than the
+	// observed one. Nil for derived levels and for conclusions written before citations were recorded.
+	SourceMessageIDs []string `json:"source_message_ids"`
+	// TimesDerived is the number of times this conclusion has been independently derived (default: 1)
+	TimesDerived int `json:"times_derived"`
 	// CreatedAt is the timestamp when the conclusion was created
 	CreatedAt time.Time `json:"created_at"`
 }

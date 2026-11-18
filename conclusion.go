@@ -54,6 +54,29 @@ func (c *Client) DeleteConclusion(ctx context.Context, workspaceID, conclusionID
 	return
 }
 
+// GetConclusion gets a single Conclusion by ID.
+//
+// Honcho answers 404 for an unknown ID, an unknown workspace or a deleted conclusion.
+//
+// https://docs.honcho.dev/v3/api-reference/endpoint/conclusions/get-conclusion
+func (c *Client) GetConclusion(ctx context.Context, workspaceID, conclusionID string) (result *Conclusion, err error) {
+	if workspaceID == "" {
+		err = errors.New("workspaceID is required")
+		return
+	}
+	if conclusionID == "" {
+		err = errors.New("conclusionID is required")
+		return
+	}
+	requestURL := c.baseURL.JoinPath(workspaceBaseURI, workspaceID, "conclusions", conclusionID)
+	result = new(Conclusion)
+	if _, err = c.request(ctx, http.MethodGet, requestURL, nil, nil, &result); err != nil {
+		err = fmt.Errorf("failed to get conclusion: %w", err)
+		return
+	}
+	return
+}
+
 // ListConclusions lists Conclusions using optional filters, ordered by recency unless `reverse` is true.
 //
 // Results are paginated.

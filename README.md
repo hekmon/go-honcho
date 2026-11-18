@@ -422,6 +422,9 @@ conclusions, err = client.QueryConclusions("workspace-id", honcho.ConclusionQuer
     Filters: map[string]any{"observer_id": "user-123", "observed_id": "user-456"},
 })
 
+// Get a conclusion by ID
+conclusion, err := client.GetConclusion(ctx, "workspace-id", "conclusion-id")
+
 // Delete a conclusion
 err = client.DeleteConclusion("workspace-id", "conclusion-id")
 ```
