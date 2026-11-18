@@ -30,7 +30,7 @@ type Message struct {
 
 // MessageCreate represents the request body for creating a single message
 type MessageCreate struct {
-	// Content is the message content (required, 0-25000 characters)
+	// Content is the message content (0-25000 characters, may be empty)
 	Content string `json:"content"`
 	// PeerID is the ID of the peer sending the message (required)
 	PeerID string `json:"peer_id"`
@@ -44,9 +44,6 @@ type MessageCreate struct {
 
 // Validate checks that mandatory fields are valid
 func (req MessageCreate) Validate() error {
-	if req.Content == "" {
-		return errors.New("content is required")
-	}
 	if utf8.RuneCountInString(req.Content) > 25000 {
 		return errors.New("content must be 25000 characters or less")
 	}

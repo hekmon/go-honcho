@@ -90,3 +90,39 @@ func TestValidateTextLength(t *testing.T) {
 		}
 	}
 }
+
+// Message content may be empty, as upstream declares it with min_length=0, while
+// the peer ID stays required. Conclusion content and chat queries still need at
+// least one character, as upstream requires. Regression test: Validate refused
+// empty message content, so a message or batch holding one never reached the
+// server.
+func TestValidateEmptyContent(t *testing.T) {
+	tests := []struct {
+		name    string
+		request interface{ Validate() error }
+		errMsg  string
+	}{
+		{name: "MessageCreate with empty content", request: MessageCreate{PeerID: "peer"}},
+		{name: "MessageBatchCreate holding an empty message", request: MessageBatchCreate{Messages: []MessageCreate{
+			{Content: "hello", PeerID: "peer"},
+			{PeerID: "peer"},
+		}}},
+		{name: "MessageCreate without peer ID", request: MessageCreate{Content: "hello"}, errMsg: "peer_id is required"},
+		{name: "ConclusionCreate with empty content", request: ConclusionCreate{ObserverID: "observer", ObservedID: "observed"}, errMsg: "content is required"},
+		{name: "DialecticOptions with empty query", request: DialecticOptions{}, errMsg: "query is required"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.request.Validate()
+			if tt.errMsg == "" {
+				if err != nil {
+					t.Errorf("Validate() error = %v, want nil", err)
+				}
+				return
+			}
+			if err == nil || err.Error() != tt.errMsg {
+				t.Errorf("Validate() error = %v, want %q", err, tt.errMsg)
+			}
+		})
+	}
+}

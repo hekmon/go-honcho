@@ -513,7 +513,7 @@ if err != nil {
 
 ### Validation Rules
 
-- **Required fields** - Must be provided (e.g., `ID`, `Content`)
+- **Required fields** - Must be provided (e.g., `ID`, `PeerID`)
 - **ID format** - Must contain only letters, numbers, underscores, or hyphens
 - **Length constraints** - IDs must be 512 characters or less
 - **Numeric constraints** - Pagination and limits have min/max values
