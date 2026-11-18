@@ -177,6 +177,8 @@ func (req MessageSearchOptions) Validate() error {
 type GetAllWorkspacesOptions struct {
 	Page int // Page is the page number (default: 1, minimum: 1)
 	Size int // Size is the page size (default: 50, minimum: 1, maximum: 100)
+	// Reverse is whether to reverse the order of results, newest workspace first (default: false)
+	Reverse bool `json:"reverse,omitempty"`
 }
 
 // PageWorkspace represents a paginated response of workspaces

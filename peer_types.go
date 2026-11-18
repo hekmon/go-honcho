@@ -53,10 +53,23 @@ func (req PeerCreate) Validate() error {
 	return nil
 }
 
+// PeerKind represents the kind of peers GetAllPeers lists
+type PeerKind string
+
+const (
+	// PeerKindScope lists the scope peers only
+	PeerKindScope PeerKind = "scope"
+	// PeerKindAll lists every peer
+	PeerKindAll PeerKind = "all"
+)
+
 // PeerGet represents the request body for getting peers with filters
 // Use nil for no filters
 type PeerGet struct {
 	Filters map[string]any `json:"filters,omitempty"`
+	// Kind is the kind of peers to list (default: empty, regular peers only). The server answers
+	// any value other than PeerKindScope and PeerKindAll with a 422
+	Kind PeerKind `json:"kind,omitempty"`
 }
 
 // PagePeer represents a paginated response of peers
@@ -136,18 +149,25 @@ type Session struct {
 	// Configuration is the session-level configuration, nil when the response holds none
 	Configuration *SessionConfiguration `json:"configuration,omitempty"`
 	CreatedAt     time.Time             `json:"created_at"`
+	// Scopes is the names of the scopes the session is in. It is nil unless GetSessionsOptions.IncludeScopes
+	// is set, and empty for a session in no scope
+	Scopes []string `json:"scopes,omitempty"`
 }
 
 // GetAllPeersOptions represents optional parameters for GetAllPeers
 type GetAllPeersOptions struct {
 	Page int // Page is the page number (default: 1, minimum: 1)
 	Size int // Size is the page size (default: 50, minimum: 1, maximum: 100)
+	// Reverse is whether to reverse the order of results, newest peer first (default: false)
+	Reverse bool `json:"reverse,omitempty"`
 }
 
 // GetSessionsForPeerOptions represents optional parameters for GetSessionsForPeer
 type GetSessionsForPeerOptions struct {
 	Page int // Page is the page number (default: 1, minimum: 1)
 	Size int // Size is the page size (default: 50, minimum: 1, maximum: 100)
+	// Reverse is whether to reverse the order of results, newest session first (default: false)
+	Reverse bool `json:"reverse,omitempty"`
 }
 
 // GetPeerContextOptions represents optional parameters for GetPeerContext

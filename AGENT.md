@@ -485,11 +485,11 @@ func (c *Client) MethodName(req RequestType) (result *ResultType, err error) {
 ```go
 // ✅ Match the pattern used in similar methods (e.g., session.go)
 // When a method has both request body and options parameters:
-func (c *Client) GetSessions(workspaceID string, req *SessionGet, opts *GetSessionsOptions) (result *PageSession, err error)
+func (c *Client) GetSessions(workspaceID string, req *WorkspaceSessionGet, opts *GetSessionsOptions) (result *PageSession, err error)
 //                                          ^^^ request body first         ^^^^ options second
 
 // ❌ Don't invent new parameter orderings - check existing methods first
-func (c *Client) GetSessions(workspaceID string, opts *GetSessionsOptions, req *SessionGet) // wrong order!
+func (c *Client) GetSessions(workspaceID string, opts *GetSessionsOptions, req *WorkspaceSessionGet) // wrong order!
 ```
 
 **Pattern:** Request body parameters come BEFORE optional query parameter structs. This matches the API structure (body is primary, query params are modifiers).

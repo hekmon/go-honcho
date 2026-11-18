@@ -280,7 +280,7 @@ sessions, err := client.GetSessions("workspace-id", nil, &honcho.GetSessionsOpti
 })
 
 // Get sessions with filters
-sessions, err = client.GetSessions("workspace-id", &honcho.SessionGet{
+sessions, err = client.GetSessions("workspace-id", &honcho.WorkspaceSessionGet{
     Filters: map[string]any{"status": "active"},
 }, &honcho.GetSessionsOptions{
     Page: 1,
@@ -844,7 +844,7 @@ go func() {
 sessions, err := client.GetSessions("workspace-id", nil, nil)
 
 // ✅ Pass struct when filters are needed
-sessions, err := client.GetSessions("workspace-id", &honcho.SessionGet{
+sessions, err := client.GetSessions("workspace-id", &honcho.WorkspaceSessionGet{
     Filters: map[string]any{"status": "active"},
 }, nil)
 ```

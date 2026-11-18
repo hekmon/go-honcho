@@ -61,6 +61,9 @@ func (c *Client) GetAllPeers(ctx context.Context, workspaceID string, req *PeerG
 		if opts.Size > 0 {
 			query.Set("size", strconv.Itoa(opts.Size))
 		}
+		if opts.Reverse {
+			query.Set("reverse", "true")
+		}
 		requestURL.RawQuery = query.Encode()
 	}
 	result = new(PagePeer)
@@ -286,6 +289,9 @@ func (c *Client) GetSessionsForPeer(ctx context.Context, workspaceID, peerID str
 		}
 		if opts.Size > 0 {
 			query.Set("size", strconv.Itoa(opts.Size))
+		}
+		if opts.Reverse {
+			query.Set("reverse", "true")
 		}
 		requestURL.RawQuery = query.Encode()
 	}

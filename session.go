@@ -40,7 +40,7 @@ func (c *Client) GetOrCreateSession(ctx context.Context, workspaceID string, req
 // GetSessions gets all Sessions for a Workspace, paginated with optional filters.
 //
 // https://docs.honcho.dev/v3/api-reference/endpoint/sessions/get-sessions
-func (c *Client) GetSessions(ctx context.Context, workspaceID string, req *SessionGet, opts *GetSessionsOptions) (result *PageSession, err error) {
+func (c *Client) GetSessions(ctx context.Context, workspaceID string, req *WorkspaceSessionGet, opts *GetSessionsOptions) (result *PageSession, err error) {
 	if workspaceID == "" {
 		err = errors.New("workspaceID is required")
 		return
@@ -56,6 +56,12 @@ func (c *Client) GetSessions(ctx context.Context, workspaceID string, req *Sessi
 		}
 		if opts.Size > 0 {
 			query.Set("size", strconv.Itoa(opts.Size))
+		}
+		if opts.Reverse {
+			query.Set("reverse", "true")
+		}
+		if opts.IncludeScopes {
+			query.Set("include_scopes", "true")
 		}
 		requestURL.RawQuery = query.Encode()
 	}

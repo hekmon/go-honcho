@@ -548,3 +548,80 @@ func TestChatNotStreamed(t *testing.T) {
 		t.Errorf("body = %s, want it without the stream field", body)
 	}
 }
+
+// GetAllPeers sends reverse=true when Reverse is set and the kind in the body when Kind is
+// set. Left unset, neither is sent, so the server applies its defaults: oldest peer first,
+// and regular peers only.
+func TestGetAllPeersRequest(t *testing.T) {
+	filters := map[string]any{"metadata": map[string]any{"role": "agent"}}
+	tests := []struct {
+		name      string
+		req       *PeerGet
+		opts      *GetAllPeersOptions
+		wantQuery url.Values
+		wantBody  string
+	}{
+		{name: "nil request and nil options", wantQuery: url.Values{}, wantBody: `null`},
+		{
+			name:      "empty request and empty options",
+			req:       &PeerGet{},
+			opts:      &GetAllPeersOptions{},
+			wantQuery: url.Values{},
+			wantBody:  `{}`,
+		},
+		{name: "reverse set", opts: &GetAllPeersOptions{Reverse: true}, wantQuery: url.Values{"reverse": {"true"}}, wantBody: `null`},
+		{name: "reverse not set", opts: &GetAllPeersOptions{Page: 2}, wantQuery: url.Values{"page": {"2"}}, wantBody: `null`},
+		{name: "scope peers", req: &PeerGet{Kind: PeerKindScope}, wantQuery: url.Values{}, wantBody: `{"kind":"scope"}`},
+		{name: "every peer", req: &PeerGet{Kind: PeerKindAll}, wantQuery: url.Values{}, wantBody: `{"kind":"all"}`},
+		{
+			name:      "kind not set",
+			req:       &PeerGet{Filters: filters},
+			wantQuery: url.Values{},
+			wantBody:  `{"filters":{"metadata":{"role":"agent"}}}`,
+		},
+		{
+			name:      "kind with filters and reverse",
+			req:       &PeerGet{Filters: filters, Kind: PeerKindAll},
+			opts:      &GetAllPeersOptions{Reverse: true},
+			wantQuery: url.Values{"reverse": {"true"}},
+			wantBody:  `{"filters":{"metadata":{"role":"agent"}},"kind":"all"}`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client, received := scopeServer(t, http.StatusOK, emptyPageJSON)
+
+			if _, err := client.GetAllPeers(t.Context(), "workspace", tt.req, tt.opts); err != nil {
+				t.Fatalf("GetAllPeers: %v", err)
+			}
+
+			checkScopeRequest(t, received(), http.MethodPost, "/v3/workspaces/workspace/peers/list", tt.wantQuery, tt.wantBody)
+		})
+	}
+}
+
+// GetSessionsForPeer sends reverse=true when Reverse is set, and otherwise no reverse
+// parameter at all, so the server keeps its default order, oldest session first.
+func TestGetSessionsForPeerReverse(t *testing.T) {
+	tests := []struct {
+		name      string
+		opts      *GetSessionsForPeerOptions
+		wantQuery url.Values
+	}{
+		{name: "reverse set", opts: &GetSessionsForPeerOptions{Reverse: true}, wantQuery: url.Values{"reverse": {"true"}}},
+		{name: "reverse not set", opts: &GetSessionsForPeerOptions{Page: 2}, wantQuery: url.Values{"page": {"2"}}},
+		{name: "empty options", opts: &GetSessionsForPeerOptions{}, wantQuery: url.Values{}},
+		{name: "nil options", wantQuery: url.Values{}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client, received := scopeServer(t, http.StatusOK, scopeSessionPageJSON)
+
+			if _, err := client.GetSessionsForPeer(t.Context(), "workspace", "alice", &SessionGet{}, tt.opts); err != nil {
+				t.Fatalf("GetSessionsForPeer: %v", err)
+			}
+
+			checkScopeRequest(t, received(), http.MethodPost, "/v3/workspaces/workspace/peers/alice/sessions", tt.wantQuery, `{}`)
+		})
+	}
+}

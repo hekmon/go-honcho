@@ -619,3 +619,32 @@ func TestScheduleDreamRebuild(t *testing.T) {
 		})
 	}
 }
+
+// emptyPageJSON is a page holding no items, in the shape every paginated list shares.
+const emptyPageJSON = `{"items":[],"total":0,"page":1,"size":50,"pages":0}`
+
+// GetAllWorkspaces sends reverse=true when Reverse is set, and otherwise no reverse parameter
+// at all, so the server keeps its default order, oldest workspace first.
+func TestGetAllWorkspacesReverse(t *testing.T) {
+	tests := []struct {
+		name      string
+		opts      *GetAllWorkspacesOptions
+		wantQuery url.Values
+	}{
+		{name: "reverse set", opts: &GetAllWorkspacesOptions{Reverse: true}, wantQuery: url.Values{"reverse": {"true"}}},
+		{name: "reverse not set", opts: &GetAllWorkspacesOptions{Page: 2}, wantQuery: url.Values{"page": {"2"}}},
+		{name: "empty options", opts: &GetAllWorkspacesOptions{}, wantQuery: url.Values{}},
+		{name: "nil options", wantQuery: url.Values{}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client, received := scopeServer(t, http.StatusOK, emptyPageJSON)
+
+			if _, err := client.GetAllWorkspaces(t.Context(), WorkspaceGetRequest{}, tt.opts); err != nil {
+				t.Fatalf("GetAllWorkspaces: %v", err)
+			}
+
+			checkScopeRequest(t, received(), http.MethodPost, "/v3/workspaces/list", tt.wantQuery, `{}`)
+		})
+	}
+}

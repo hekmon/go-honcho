@@ -54,6 +54,9 @@ func (c *Client) GetAllWorkspaces(ctx context.Context, req WorkspaceGetRequest, 
 		if opts.Size > 0 {
 			query.Set("size", strconv.Itoa(opts.Size))
 		}
+		if opts.Reverse {
+			query.Set("reverse", "true")
+		}
 		requestURL.RawQuery = query.Encode()
 	}
 	result = new(PageWorkspace)

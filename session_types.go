@@ -143,6 +143,10 @@ type GetSessionsOptions struct {
 	Page int
 	// Size is the page size (default: 50, minimum: 1, maximum: 100)
 	Size int
+	// Reverse is whether to reverse the order of results, newest session first (default: false)
+	Reverse bool `json:"reverse,omitempty"`
+	// IncludeScopes is whether to return the names of each session's scopes in Session.Scopes (default: false)
+	IncludeScopes bool `json:"include_scopes,omitempty"`
 }
 
 // GetSessionContextOptions represents optional parameters for GetSessionContext
@@ -187,6 +191,24 @@ type CloneSessionOptions struct {
 // Use nil for no filters
 type SessionGet struct {
 	Filters map[string]any `json:"filters,omitempty"`
+}
+
+// WorkspaceSessionGet represents the request body for listing the sessions of a workspace with GetSessions
+// Use nil for no filters
+//
+// It is separate from SessionGet, the request body of GetSessionsForPeer, mirroring upstream's two types.
+// The peer route silently ignores scope and in_no_scope and returns every session, so with a shared type
+// a GetSessionsForPeer caller could believe the results were restricted when they are not
+type WorkspaceSessionGet struct {
+	// Filters is the filter object on the session list (optional)
+	Filters map[string]any `json:"filters,omitempty"`
+	// Scope is the name of the scope to list the active members of (optional, nil for no restriction).
+	// It combines with Filters. The server answers an unknown scope with a 404, an empty name with a
+	// 422, and Scope set together with InNoScope with a 422
+	Scope *string `json:"scope,omitempty"`
+	// InNoScope is whether to list only the sessions in no scope (default: false). The server answers
+	// InNoScope set together with Scope with a 422
+	InNoScope bool `json:"in_no_scope,omitempty"`
 }
 
 // PageSession represents a paginated response of sessions
