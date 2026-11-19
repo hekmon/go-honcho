@@ -279,8 +279,11 @@ func (c *Client) WorkspaceChat(ctx context.Context, workspaceID string, req Work
 // WorkspaceChatStream queries a whole Workspace using natural language, as WorkspaceChat
 // does, and returns the answer chunk by chunk.
 //
-// The answer arrives when the agent finishes gathering context, usually as a single
+// A plain answer arrives when the agent finishes gathering context, usually as a single
 // chunk: only an answer synthesized at the tool-call limit streams as it is generated.
+//
+// With ResponseFormat set, the answer streams instead: the chunks are pieces of a single
+// JSON document, split anywhere, to be joined before decoding.
 //
 // The request is sent when the returned iterator is ranged over. Any failure yields a
 // single error and ends the iteration, and that includes a stream the server ends
