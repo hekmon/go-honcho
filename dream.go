@@ -18,6 +18,8 @@ import (
 //
 // Honcho answers 422 for a filter on a column it cannot filter on.
 //
+// The list is paginated by page number, or by cursor when opts.Cursor is set.
+//
 // https://docs.honcho.dev/v3/api-reference/endpoint/dreams/list-dreams
 func (c *Client) ListDreams(ctx context.Context, workspaceID string, req *DreamRunList, opts *ListDreamsOptions) (result *PageDreamRun, err error) {
 	if workspaceID == "" {
@@ -35,6 +37,9 @@ func (c *Client) ListDreams(ctx context.Context, workspaceID string, req *DreamR
 		}
 		if opts.Size > 0 {
 			query.Set("size", strconv.Itoa(opts.Size))
+		}
+		if err = setCursor(query, opts.Page, opts.Cursor); err != nil {
+			return
 		}
 	}
 	requestURL.RawQuery = query.Encode()

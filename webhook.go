@@ -33,7 +33,7 @@ func (c *Client) GetOrCreateWebhookEndpoint(ctx context.Context, workspaceID str
 
 // ListWebhookEndpoints lists all webhook endpoints, optionally filtered by workspace.
 //
-// Results are paginated. Use opts to control pagination.
+// The list is paginated by page number, or by cursor when opts.Cursor is set.
 //
 // https://docs.honcho.dev/v3/api-reference/endpoint/webhooks/list-webhook-endpoints
 func (c *Client) ListWebhookEndpoints(ctx context.Context, workspaceID string, opts *ListWebhookEndpointsOptions) (result *PageWebhookEndpoint, err error) {
@@ -56,6 +56,9 @@ func (c *Client) ListWebhookEndpoints(ctx context.Context, workspaceID string, o
 		}
 		if opts.Size > 0 {
 			query.Set("size", strconv.Itoa(opts.Size))
+		}
+		if err = setCursor(query, opts.Page, opts.Cursor); err != nil {
+			return
 		}
 		requestURL.RawQuery = query.Encode()
 	}

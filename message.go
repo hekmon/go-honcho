@@ -115,8 +115,12 @@ func (c *Client) GetMessage(ctx context.Context, workspaceID, sessionID, message
 	return
 }
 
+// GetMessages gets all Messages for a Session, paginated with optional filters.
+//
+// The list is paginated by page number, or by cursor when opts.Cursor is set.
+//
 // https://docs.honcho.dev/v3/api-reference/endpoint/messages/get-messages
-func (c *Client) GetMessages(ctx context.Context, workspaceID, sessionID string, req *MessageGet, options *GetMessagesOptions) (result *PageMessage, err error) {
+func (c *Client) GetMessages(ctx context.Context, workspaceID, sessionID string, req *MessageGet, opts *GetMessagesOptions) (result *PageMessage, err error) {
 	// Construct URL
 	requestURL, err := c.endpoint(workspaceBaseURI, workspaceID, "sessions", sessionID, "messages", "list")
 	if err != nil {
@@ -124,15 +128,18 @@ func (c *Client) GetMessages(ctx context.Context, workspaceID, sessionID string,
 	}
 	// Add query parameters
 	queryParams := requestURL.Query()
-	if options != nil {
-		if options.Reverse {
+	if opts != nil {
+		if opts.Reverse {
 			queryParams.Set("reverse", "true")
 		}
-		if options.Page > 0 {
-			queryParams.Set("page", strconv.Itoa(options.Page))
+		if opts.Page > 0 {
+			queryParams.Set("page", strconv.Itoa(opts.Page))
 		}
-		if options.Size > 0 {
-			queryParams.Set("size", strconv.Itoa(options.Size))
+		if opts.Size > 0 {
+			queryParams.Set("size", strconv.Itoa(opts.Size))
+		}
+		if err = setCursor(queryParams, opts.Page, opts.Cursor); err != nil {
+			return
 		}
 	}
 	requestURL.RawQuery = queryParams.Encode()

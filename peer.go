@@ -43,6 +43,8 @@ func (c *Client) GetOrCreatePeer(ctx context.Context, workspaceID string, req Pe
 
 // GetAllPeers gets all Peers for a Workspace, paginated with optional filters.
 //
+// The list is paginated by page number, or by cursor when opts.Cursor is set.
+//
 // https://docs.honcho.dev/v3/api-reference/endpoint/peers/get-peers
 func (c *Client) GetAllPeers(ctx context.Context, workspaceID string, req *PeerGet, opts *GetAllPeersOptions) (result *PagePeer, err error) {
 	if workspaceID == "" {
@@ -60,6 +62,9 @@ func (c *Client) GetAllPeers(ctx context.Context, workspaceID string, req *PeerG
 		}
 		if opts.Size > 0 {
 			query.Set("size", strconv.Itoa(opts.Size))
+		}
+		if err = setCursor(query, opts.Page, opts.Cursor); err != nil {
+			return
 		}
 		if opts.Reverse {
 			query.Set("reverse", "true")
@@ -274,6 +279,8 @@ func (c *Client) GetPeerContext(ctx context.Context, workspaceID, peerID string,
 
 // GetSessionsForPeer gets all Sessions for a Peer, paginated with optional filters.
 //
+// The list is paginated by page number, or by cursor when opts.Cursor is set.
+//
 // https://docs.honcho.dev/v3/api-reference/endpoint/peers/get-sessions-for-peer
 func (c *Client) GetSessionsForPeer(ctx context.Context, workspaceID, peerID string, req *SessionGet, opts *GetSessionsForPeerOptions) (result *PageSession, err error) {
 	if workspaceID == "" {
@@ -295,6 +302,9 @@ func (c *Client) GetSessionsForPeer(ctx context.Context, workspaceID, peerID str
 		}
 		if opts.Size > 0 {
 			query.Set("size", strconv.Itoa(opts.Size))
+		}
+		if err = setCursor(query, opts.Page, opts.Cursor); err != nil {
+			return
 		}
 		if opts.Reverse {
 			query.Set("reverse", "true")

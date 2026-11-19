@@ -100,14 +100,25 @@ type MessageConfiguration struct {
 type PageMessage struct {
 	// Items is the array of messages in the current page
 	Items []Message `json:"items"`
-	// Total is the total number of messages
+	// Total is the total number of messages. It is zero on a cursor page
 	Total int `json:"total"`
-	// Page is the current page number
+	// Page is the current page number. It is zero on a cursor page
 	Page int `json:"page"`
-	// Size is the page size
+	// Size is the page size. It is zero on a cursor page
 	Size int `json:"size"`
-	// Pages is the total number of pages
+	// Pages is the total number of pages. It is zero on a cursor page
 	Pages int `json:"pages"`
+	// CurrentPage is the cursor to refetch the current page. It is set only on a cursor page
+	CurrentPage *string `json:"current_page,omitempty"`
+	// CurrentPageBackwards is the cursor to refetch the current page starting from the last item.
+	// It is set only on a cursor page
+	CurrentPageBackwards *string `json:"current_page_backwards,omitempty"`
+	// PreviousPage is the cursor for the previous page. It is set only on a cursor page, and is nil
+	// on the first page
+	PreviousPage *string `json:"previous_page,omitempty"`
+	// NextPage is the cursor for the next page, to set as Cursor for the next request. It is set
+	// only on a cursor page, and is nil on the last page
+	NextPage *string `json:"next_page,omitempty"`
 }
 
 // GetMessagesOptions represents optional parameters for GetMessages
@@ -118,6 +129,13 @@ type GetMessagesOptions struct {
 	Page int `json:"page,omitempty"`
 	// Size is the page size (default: 50, minimum: 1, maximum: 100)
 	Size int `json:"size,omitempty"`
+	// Cursor opts in to cursor pagination when not nil (default: nil, for page numbers). An empty
+	// cursor, new(string), asks for the first page: then set Cursor to each page's NextPage until
+	// that is nil. A cursor page has no total and no page numbers. A cursor holds only a position
+	// and is only valid for the list that returned it, so keep the other options and any filters
+	// unchanged while following cursors. Page cannot be combined with Cursor: the request is
+	// refused before it is sent, as the server would ignore the page
+	Cursor *string `json:"cursor,omitempty"`
 }
 
 // MessageUpload represents the request body for uploading a file to create messages

@@ -653,46 +653,67 @@ if err != nil {
 
 ## Pagination
 
-List operations return paginated results:
+List methods paginate by page number by default, or by cursor when the `Cursor` of their options is set. Every page type has the same fields as `PageSession`, with its own type of items:
 
 ```go
-// Paginated response structure
 type PageSession struct {
-    Sessions   []Session `json:"sessions"`
-    Page       int       `json:"page"`
-    Size       int       `json:"size"`
-    TotalCount int       `json:"total_count"`
-    TotalPages int       `json:"total_pages"`
+    Items []Session `json:"items"`
+    // Set on a numbered page, zero on a cursor page
+    Total int `json:"total"`
+    Page  int `json:"page"`
+    Size  int `json:"size"`
+    Pages int `json:"pages"`
+    // Set only on a cursor page
+    CurrentPage          *string `json:"current_page,omitempty"`
+    CurrentPageBackwards *string `json:"current_page_backwards,omitempty"`
+    PreviousPage         *string `json:"previous_page,omitempty"` // nil on the first page
+    NextPage             *string `json:"next_page,omitempty"`     // nil on the last page
 }
+```
 
-// Use pagination options - pass nil for req when no filters needed
-sessions, err := client.GetSessions("workspace-id", nil, &honcho.GetSessionsOptions{
-    Page:    1,  // Page number (default: 1)
-    Size:    50, // Items per page (default: 50, max: 100)
-    Reverse: false, // Order direction (default: false)
-})
+### By Page Number
 
-// Iterate through all pages
-for page := 1; ; page++ {
-    sessions, err := client.GetSessions("workspace-id", nil, &honcho.GetSessionsOptions{
-        Page: page,
-        Size: 50,
+```go
+// Walk every page - pass nil for req when no filters needed
+for number := 1; ; number++ {
+    page, err := client.GetSessions(ctx, "workspace-id", nil, &honcho.GetSessionsOptions{
+        Page:    number, // Page number (default: 1)
+        Size:    50,     // Items per page (default: 50, max: 100)
+        Reverse: false,  // Newest first when true (default: false)
     })
     if err != nil {
         log.Fatal(err)
     }
-    
-    // Process sessions
-    for _, session := range sessions.Sessions {
+    for _, session := range page.Items {
         // ...
     }
-    
-    // Check if more pages exist
-    if page >= sessions.TotalPages {
+    if number >= page.Pages {
         break
     }
 }
 ```
+
+### By Cursor
+
+Set `Cursor` to an empty cursor, `new(string)`, for the first page, then to each page's `NextPage` until that is nil:
+
+```go
+opts := &honcho.GetSessionsOptions{Cursor: new(string), Size: 100}
+for opts.Cursor != nil {
+    page, err := client.GetSessions(ctx, "workspace-id", nil, opts)
+    if err != nil {
+        log.Fatal(err)
+    }
+    for _, session := range page.Items {
+        // ...
+    }
+    opts.Cursor = page.NextPage // nil after the last page
+}
+```
+
+- A cursor page has no total and no page numbers: `Total`, `Page`, `Size` and `Pages` are zero.
+- A cursor holds only a position and is only valid for the list that returned it: keep the other options and the filters unchanged while following cursors, as a cursor used otherwise can return a wrong page without any error. A cursor the server cannot read comes back as an error holding `Invalid cursor`.
+- `Page` cannot be combined with `Cursor`: the request is refused before it is sent, as the server would ignore the page.
 
 ## Pointer Semantics
 

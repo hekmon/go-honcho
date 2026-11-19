@@ -46,6 +46,8 @@ func (c *Client) GetOrCreateScope(ctx context.Context, workspaceID string, req S
 // `{"filters": {"id": {"icontains": "sup"}}}`: `id` is the unprefixed scope name. Set
 // IncludeSessionCount to get each scope's member session count in SessionCount.
 //
+// The list is paginated by page number, or by cursor when opts.Cursor is set.
+//
 // https://docs.honcho.dev/v3/api-reference/endpoint/scopes/get-scopes
 func (c *Client) GetScopes(ctx context.Context, workspaceID string, req *ScopeGet, opts *GetScopesOptions) (result *PageScope, err error) {
 	if workspaceID == "" {
@@ -63,6 +65,9 @@ func (c *Client) GetScopes(ctx context.Context, workspaceID string, req *ScopeGe
 		}
 		if opts.Size > 0 {
 			query.Set("size", strconv.Itoa(opts.Size))
+		}
+		if err = setCursor(query, opts.Page, opts.Cursor); err != nil {
+			return
 		}
 		if opts.Reverse {
 			query.Set("reverse", "true")
@@ -176,6 +181,8 @@ func (c *Client) AddSessionsToScope(ctx context.Context, workspaceID, scopeID st
 //
 // Honcho answers 404 for an unknown scope.
 //
+// The list is paginated by page number, or by cursor when opts.Cursor is set.
+//
 // https://docs.honcho.dev/v3/api-reference/endpoint/scopes/get-scope-sessions
 func (c *Client) GetScopeSessions(ctx context.Context, workspaceID, scopeID string, opts *GetScopeSessionsOptions) (result *PageSession, err error) {
 	if workspaceID == "" {
@@ -197,6 +204,9 @@ func (c *Client) GetScopeSessions(ctx context.Context, workspaceID, scopeID stri
 		}
 		if opts.Size > 0 {
 			query.Set("size", strconv.Itoa(opts.Size))
+		}
+		if err = setCursor(query, opts.Page, opts.Cursor); err != nil {
+			return
 		}
 		if opts.Reverse {
 			query.Set("reverse", "true")

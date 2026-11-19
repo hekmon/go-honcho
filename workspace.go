@@ -6,12 +6,32 @@ import (
 	"fmt"
 	"iter"
 	"net/http"
+	"net/url"
 	"strconv"
 )
 
 const (
 	workspaceBaseURI = "/v3/workspaces"
 )
+
+// errPageWithCursor is the error of every list method given both a page and a cursor:
+// the server silently ignores the page of a request holding a cursor.
+var errPageWithCursor = errors.New("page cannot be combined with cursor: leave page at 0 to paginate by cursor")
+
+// setCursor sets the cursor query parameter of a list request when cursor is not nil,
+// even to an empty cursor, which asks for the first page of cursor pagination. It
+// refuses a cursor given together with a page, which the server would silently ignore,
+// so that every list method checks it the same way before anything is sent.
+func setCursor(query url.Values, page int, cursor *string) error {
+	if cursor == nil {
+		return nil
+	}
+	if page > 0 {
+		return errPageWithCursor
+	}
+	query.Set("cursor", *cursor)
+	return nil
+}
 
 // GetOrCreateWorkspace gets a Workspace by ID or creates a new one.
 //
@@ -40,6 +60,8 @@ func (c *Client) GetOrCreateWorkspace(ctx context.Context, req CreateWorkspaceRe
 
 // GetAllWorkspaces gets all Workspaces, paginated with optional filters.
 //
+// The list is paginated by page number, or by cursor when opts.Cursor is set.
+//
 // https://docs.honcho.dev/v3/api-reference/endpoint/workspaces/get-all-workspaces
 func (c *Client) GetAllWorkspaces(ctx context.Context, req WorkspaceGetRequest, opts *GetAllWorkspacesOptions) (result *PageWorkspace, err error) {
 	requestURL, err := c.endpoint(workspaceBaseURI, "list")
@@ -53,6 +75,9 @@ func (c *Client) GetAllWorkspaces(ctx context.Context, req WorkspaceGetRequest, 
 		}
 		if opts.Size > 0 {
 			query.Set("size", strconv.Itoa(opts.Size))
+		}
+		if err = setCursor(query, opts.Page, opts.Cursor); err != nil {
+			return
 		}
 		if opts.Reverse {
 			query.Set("reverse", "true")

@@ -203,17 +203,40 @@ func (req WorkspaceMessageSearchOptions) Validate() error {
 type GetAllWorkspacesOptions struct {
 	Page int // Page is the page number (default: 1, minimum: 1)
 	Size int // Size is the page size (default: 50, minimum: 1, maximum: 100)
+	// Cursor opts in to cursor pagination when not nil (default: nil, for page numbers). An empty
+	// cursor, new(string), asks for the first page: then set Cursor to each page's NextPage until
+	// that is nil. A cursor page has no total and no page numbers. A cursor holds only a position
+	// and is only valid for the list that returned it, so keep the other options and any filters
+	// unchanged while following cursors. Page cannot be combined with Cursor: the request is
+	// refused before it is sent, as the server would ignore the page
+	Cursor *string `json:"cursor,omitempty"`
 	// Reverse is whether to reverse the order of results, newest workspace first (default: false)
 	Reverse bool `json:"reverse,omitempty"`
 }
 
 // PageWorkspace represents a paginated response of workspaces
 type PageWorkspace struct {
+	// Items is the list of workspaces on this page
 	Items []Workspace `json:"items"`
-	Total int         `json:"total"`
-	Page  int         `json:"page"`
-	Size  int         `json:"size"`
-	Pages int         `json:"pages"`
+	// Total is the total number of matching workspaces. It is zero on a cursor page
+	Total int `json:"total"`
+	// Page is the current page number. It is zero on a cursor page
+	Page int `json:"page"`
+	// Size is the page size. It is zero on a cursor page
+	Size int `json:"size"`
+	// Pages is the total number of pages. It is zero on a cursor page
+	Pages int `json:"pages"`
+	// CurrentPage is the cursor to refetch the current page. It is set only on a cursor page
+	CurrentPage *string `json:"current_page,omitempty"`
+	// CurrentPageBackwards is the cursor to refetch the current page starting from the last item.
+	// It is set only on a cursor page
+	CurrentPageBackwards *string `json:"current_page_backwards,omitempty"`
+	// PreviousPage is the cursor for the previous page. It is set only on a cursor page, and is nil
+	// on the first page
+	PreviousPage *string `json:"previous_page,omitempty"`
+	// NextPage is the cursor for the next page, to set as Cursor for the next request. It is set
+	// only on a cursor page, and is nil on the last page
+	NextPage *string `json:"next_page,omitempty"`
 }
 
 // WorkspaceChatOptions represents the request body for chatting with a whole workspace

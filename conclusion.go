@@ -88,7 +88,7 @@ func (c *Client) GetConclusion(ctx context.Context, workspaceID, conclusionID st
 
 // ListConclusions lists Conclusions using optional filters, ordered by recency unless `reverse` is true.
 //
-// Results are paginated.
+// The list is paginated by page number, or by cursor when opts.Cursor is set.
 //
 // https://docs.honcho.dev/v3/api-reference/endpoint/conclusions/list-conclusions
 func (c *Client) ListConclusions(ctx context.Context, workspaceID string, req *ConclusionGet, opts *ListConclusionsOptions) (result *PageConclusion, err error) {
@@ -110,6 +110,9 @@ func (c *Client) ListConclusions(ctx context.Context, workspaceID string, req *C
 		}
 		if opts.Size > 0 {
 			query.Set("size", strconv.Itoa(opts.Size))
+		}
+		if err = setCursor(query, opts.Page, opts.Cursor); err != nil {
+			return
 		}
 	}
 	requestURL.RawQuery = query.Encode()

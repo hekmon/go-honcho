@@ -676,13 +676,18 @@ if _, err = c.request(http.MethodGet, requestURL, nil, nil, &result); err != nil
 **Paginated responses follow a consistent pattern:**
 
 ```go
-// ✅ Paginated response structure
+// ✅ Paginated response structure: the fields of a numbered page, then the cursors
 type PageSession struct {
-    Sessions   []Session `json:"sessions"`
-    Page       int       `json:"page"`
-    Size       int       `json:"size"`
-    TotalCount int       `json:"total_count"`
-    TotalPages int       `json:"total_pages"`
+    Items []Session `json:"items"`
+    Total int       `json:"total"` // zero on a cursor page, where the server sends null
+    Page  int       `json:"page"`  // zero on a cursor page
+    Size  int       `json:"size"`  // zero on a cursor page
+    Pages int       `json:"pages"` // zero on a cursor page
+    // Set only on a cursor page
+    CurrentPage          *string `json:"current_page,omitempty"`
+    CurrentPageBackwards *string `json:"current_page_backwards,omitempty"`
+    PreviousPage         *string `json:"previous_page,omitempty"` // nil on the first page
+    NextPage             *string `json:"next_page,omitempty"`     // nil on the last page
 }
 
 // ✅ Pagination in options struct
@@ -691,20 +696,43 @@ type GetSessionsOptions struct {
     Page int `json:"page,omitempty"`
     // Size is the page size (default: 50, minimum: 1, maximum: 100)
     Size int `json:"size,omitempty"`
+    // Cursor opts in to cursor pagination when not nil (default: nil, for page numbers)
+    Cursor *string `json:"cursor,omitempty"`  // nil = page numbers, "" = first cursor page
     // Reverse is whether to reverse the order of results (default: false)
     Reverse bool `json:"reverse,omitempty"`  // false = use server default
+}
+
+// ✅ Cursor in the query, through the shared helper: sent whenever it is not nil, even empty,
+// and refused with errPageWithCursor when Page is also set
+if err = setCursor(query, opts.Page, opts.Cursor); err != nil {
+    return
+}
+```
+
+**Cursor pagination:** every list route takes a `cursor` query parameter. Sending it, even empty, switches the route to cursor pagination: an empty cursor gets the first page, and each page's `next_page` is the cursor of the following one, `null` on the last page. A cursor page has a `null` total and no `page`, `size` or `pages`. The server silently ignores `page` when a cursor is sent, so every list method refuses `Page` set together with `Cursor` before anything is sent: `setCursor` does it with the query, and a `Validate()` on options must refuse it with the same `errPageWithCursor`. A cursor holds only a position and is only valid for the list that returned it, so callers keep the other options and the filters unchanged while following cursors. Callers walk a list like this:
+
+```go
+opts := &GetSessionsOptions{Cursor: new(string), Size: 100}
+for opts.Cursor != nil {
+    page, err := client.GetSessions(ctx, workspaceID, nil, opts)
+    if err != nil {
+        return err
+    }
+    // use page.Items
+    opts.Cursor = page.NextPage // nil after the last page
 }
 ```
 
 **Pagination Guidelines:**
 - ✅ Use `Page*` prefix for paginated response types (e.g., `PageSession`, `PagePeer`)
-- ✅ Include pagination metadata in response (page, size, total_count, total_pages)
+- ✅ Include pagination metadata in response (items, total, page, size, pages, and the four cursors)
 - ✅ Document default values and constraints for pagination parameters
 - ✅ Use value types for Page/Size with `omitempty` (0 = use server default)
 - ✅ Use `bool` with `omitempty` for Reverse (false = use server default)
+- ✅ Use `*string` for Cursor (nil = page numbers, empty = first cursor page), set in the query with `setCursor`
 - ✅ Simplify query parameter handling: `if opts.Reverse { query.Set("reverse", "true") }`
 - ❌ Don't omit pagination metadata from response types
-- ❌ Don't use pointer types for Page/Size/Reverse in pagination options
+- ❌ Don't use pointer types for Page/Size/Reverse in pagination options. Cursor is the one exception: an empty cursor, which asks for the first cursor page, differs from no cursor, which keeps page numbers
 
 ---
 
