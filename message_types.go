@@ -1,9 +1,12 @@
 package honcho
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"mime"
+	"strings"
 	"time"
 	"unicode/utf8"
 )
@@ -138,29 +141,65 @@ type GetMessagesOptions struct {
 	Cursor *string `json:"cursor,omitempty"`
 }
 
-// MessageUpload represents the request body for uploading a file to create messages
+// MessageUpload represents the request for uploading a file to create messages. It is sent as a
+// multipart form: the file as a part declaring its media type, and each other optional field as a
+// form field written only when set
 type MessageUpload struct {
 	// File is the file content to upload (will be converted to text and split into messages)
 	File []byte `json:"-"`
 	// Filename is the name of the file being uploaded
 	Filename string `json:"-"`
+	// ContentType is the media type of the file, which Honcho reads the file according to. Honcho
+	// accepts application/pdf, application/json (exactly, without parameters) and any text/* type,
+	// such as text/plain or text/markdown, and answers 415 for any other type. Leave it empty to
+	// detect it from the content with http.DetectContentType, which tells PDFs and text apart: a
+	// JSON file is then read as text, so set application/json to have it read as JSON. Validate
+	// refuses a value mime.ParseMediaType cannot parse, such as text plain, or holding a line break,
+	// which would break the header of the file part
+	ContentType string `json:"-"`
 	// PeerID is the ID of the peer sending the message (required)
 	PeerID string `json:"peer_id"`
-	// Metadata is optional metadata for the message (as JSON string in multipart form)
-	Metadata *string `json:"metadata,omitempty"`
-	// Configuration is optional message-level configuration (as JSON string in multipart form)
-	Configuration *string `json:"configuration,omitempty"`
-	// CreatedAt is optional timestamp for the message (as RFC3339 string in multipart form)
-	CreatedAt *string `json:"created_at,omitempty"`
+	// Metadata is optional metadata for the messages, a JSON object, sent as given as the metadata
+	// form field when not empty. Leave it empty for no metadata: Validate refuses a non-empty value
+	// that is not a JSON object, as the server would otherwise silently drop invalid JSON, creating
+	// the messages without metadata, and store null as no metadata
+	Metadata json.RawMessage `json:"metadata,omitempty"`
+	// Configuration is optional message-level configuration, sent marshalled to JSON as the
+	// configuration form field when not nil
+	Configuration *MessageConfiguration `json:"configuration,omitempty"`
+	// CreatedAt is optional timestamp for the messages, sent formatted with time.RFC3339Nano as the
+	// created_at form field when not nil. Its year, in its own location, must be between 1 and 9999:
+	// the server cannot parse any other, and would silently use the time of the upload instead
+	CreatedAt *time.Time `json:"created_at,omitempty"`
 }
 
-// Validate checks that mandatory fields are valid
+// Validate checks that mandatory fields are valid, and that the optional fields hold values the
+// server parses rather than silently drops
 func (req MessageUpload) Validate() error {
 	if len(req.File) == 0 {
 		return errors.New("file is required")
 	}
 	if req.PeerID == "" {
 		return errors.New("peer_id is required")
+	}
+	if req.ContentType != "" {
+		if _, _, err := mime.ParseMediaType(req.ContentType); err != nil {
+			return fmt.Errorf("content_type must be a media type such as text/plain: %w", err)
+		}
+		// ParseMediaType skips a line break around the type or between parameters, which would
+		// still break the header of the file part
+		if strings.ContainsAny(req.ContentType, "\r\n") {
+			return errors.New("content_type must not hold a line break")
+		}
+	}
+	// Valid JSON whose first character, after any whitespace, is "{" holds an object
+	if len(req.Metadata) > 0 && (!json.Valid(req.Metadata) || bytes.TrimLeft(req.Metadata, " \t\r\n")[0] != '{') {
+		return errors.New("metadata must be a JSON object: leave it empty for no metadata")
+	}
+	if req.CreatedAt != nil {
+		if year := req.CreatedAt.Year(); year < 1 || year > 9999 {
+			return errors.New("created_at year must be between 1 and 9999")
+		}
 	}
 	return nil
 }

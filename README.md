@@ -383,12 +383,12 @@ messages, err := client.CreateMessagesForSession(ctx, "workspace-id", "session-i
 
 // Create messages with file upload
 fileContent := []byte("file content here")
-metadata := `{"source": "upload"}` // optional, a JSON object as text
 messages, err = client.CreateMessagesWithFile(ctx, "workspace-id", "session-id", honcho.MessageUpload{
     File:     fileContent,
     Filename: "document.txt",
+    // ContentType is detected from the content when empty: text/plain here
     PeerID:   "user-123",
-    Metadata: &metadata,
+    Metadata: json.RawMessage(`{"source": "upload"}`), // optional, a JSON object
 })
 
 // Get a single message

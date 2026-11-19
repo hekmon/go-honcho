@@ -1422,8 +1422,16 @@ func (c *Client) CreateMessagesWithFile(ctx context.Context, workspaceID, sessio
     // Build multipart form
     bodyBuffer := &bytes.Buffer{}
     writer := multipart.NewWriter(bodyBuffer)
-    // Add file field
-    fileWriter, err := writer.CreateFormFile("file", req.Filename)
+    // Add file field, declaring the media type Honcho reads the file according to: CreateFormFile
+    // would declare application/octet-stream, which Honcho refuses
+    contentType := req.ContentType
+    if contentType == "" {
+        contentType = http.DetectContentType(req.File)
+    }
+    fileHeader := make(textproto.MIMEHeader)
+    fileHeader.Set("Content-Disposition", multipart.FileContentDisposition("file", req.Filename))
+    fileHeader.Set("Content-Type", contentType)
+    fileWriter, err := writer.CreatePart(fileHeader)
     if err != nil {
         err = fmt.Errorf("failed to create form file: %w", err)
         return
@@ -1432,24 +1440,50 @@ func (c *Client) CreateMessagesWithFile(ctx context.Context, workspaceID, sessio
         err = fmt.Errorf("failed to write file to form: %w", err)
         return
     }
-    // Add other form fields
+    // Add peer_id field
     if err = writer.WriteField("peer_id", req.PeerID); err != nil {
         err = fmt.Errorf("failed to write peer_id field: %w", err)
         return
     }
-    // Close multipart writer BEFORE making request
+    // Add optional metadata field, which Validate checked is a JSON object
+    if len(req.Metadata) > 0 {
+        if err = writer.WriteField("metadata", string(req.Metadata)); err != nil {
+            err = fmt.Errorf("failed to write metadata field: %w", err)
+            return
+        }
+    }
+    // Add optional configuration field, marshalled to JSON
+    if req.Configuration != nil {
+        var configuration []byte
+        if configuration, err = json.Marshal(req.Configuration); err != nil {
+            err = fmt.Errorf("failed to marshal configuration: %w", err)
+            return
+        }
+        if err = writer.WriteField("configuration", string(configuration)); err != nil {
+            err = fmt.Errorf("failed to write configuration field: %w", err)
+            return
+        }
+    }
+    // Add optional created_at field, keeping its nanoseconds and its zone
+    if req.CreatedAt != nil {
+        if err = writer.WriteField("created_at", req.CreatedAt.Format(time.RFC3339Nano)); err != nil {
+            err = fmt.Errorf("failed to write created_at field: %w", err)
+            return
+        }
+    }
+    // Close multipart writer
     if err = writer.Close(); err != nil {
         err = fmt.Errorf("failed to close multipart writer: %w", err)
         return
     }
-    // Build headers with Content-Type (includes boundary)
+    // Initialize result
+    result = make([]*Message, 0)
+    // Build headers with Content-Type
     headers := make(http.Header)
     headers.Set("Content-Type", writer.FormDataContentType())
-    // Make request - pass bytes.Buffer (implements io.Reader)
-    // request() detects io.Reader and uses it directly without modification
-    // Content-Type header with boundary is preserved
+    // Make request with bytes.Buffer body (multipart data)
     if _, err = c.request(ctx, http.MethodPost, requestURL, headers, bodyBuffer, &result); err != nil {
-        err = fmt.Errorf("failed to upload file: %w", err)
+        err = fmt.Errorf("failed to upload file and create messages: %w", err)
         return
     }
     return

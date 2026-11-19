@@ -3,10 +3,13 @@ package honcho
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"mime/multipart"
 	"net/http"
+	"net/textproto"
 	"strconv"
+	"time"
 )
 
 // https://docs.honcho.dev/v3/api-reference/endpoint/messages/create-messages-for-session
@@ -30,6 +33,19 @@ func (c *Client) CreateMessagesForSession(ctx context.Context, workspaceID, sess
 	return
 }
 
+// CreateMessagesWithFile creates messages from an uploaded file.
+//
+// Honcho converts the file to text and splits it into messages from req.PeerID. The request is a
+// multipart form. Its file part declares req.ContentType, which req.Validate checks is a well-formed
+// media type, or the media type http.DetectContentType finds in the content when that is empty:
+// Honcho reads the file according to it, and answers 415 for a type it does not read.
+//
+// Metadata, configuration and created_at are form fields written only when set: metadata as the
+// JSON given, configuration marshalled to JSON, and created_at formatted with time.RFC3339Nano.
+// Honcho silently drops such a field when it cannot parse it, still creating the messages, so
+// req.Validate refuses metadata that is not a JSON object and a created_at outside the years 1 to
+// 9999 before anything is sent.
+//
 // https://docs.honcho.dev/v3/api-reference/endpoint/messages/create-messages-with-file
 func (c *Client) CreateMessagesWithFile(ctx context.Context, workspaceID, sessionID string, req MessageUpload) (result []*Message, err error) {
 	// Validate request
@@ -44,8 +60,16 @@ func (c *Client) CreateMessagesWithFile(ctx context.Context, workspaceID, sessio
 	// Build multipart form
 	bodyBuffer := &bytes.Buffer{}
 	writer := multipart.NewWriter(bodyBuffer)
-	// Add file field
-	fileWriter, err := writer.CreateFormFile("file", req.Filename)
+	// Add file field, declaring the media type Honcho reads the file according to: CreateFormFile
+	// would declare application/octet-stream, which Honcho refuses
+	contentType := req.ContentType
+	if contentType == "" {
+		contentType = http.DetectContentType(req.File)
+	}
+	fileHeader := make(textproto.MIMEHeader)
+	fileHeader.Set("Content-Disposition", multipart.FileContentDisposition("file", req.Filename))
+	fileHeader.Set("Content-Type", contentType)
+	fileWriter, err := writer.CreatePart(fileHeader)
 	if err != nil {
 		err = fmt.Errorf("failed to create form file: %w", err)
 		return
@@ -59,23 +83,28 @@ func (c *Client) CreateMessagesWithFile(ctx context.Context, workspaceID, sessio
 		err = fmt.Errorf("failed to write peer_id field: %w", err)
 		return
 	}
-	// Add optional metadata field
-	if req.Metadata != nil {
-		if err = writer.WriteField("metadata", *req.Metadata); err != nil {
+	// Add optional metadata field, which Validate checked is a JSON object
+	if len(req.Metadata) > 0 {
+		if err = writer.WriteField("metadata", string(req.Metadata)); err != nil {
 			err = fmt.Errorf("failed to write metadata field: %w", err)
 			return
 		}
 	}
-	// Add optional configuration field
+	// Add optional configuration field, marshalled to JSON
 	if req.Configuration != nil {
-		if err = writer.WriteField("configuration", *req.Configuration); err != nil {
+		var configuration []byte
+		if configuration, err = json.Marshal(req.Configuration); err != nil {
+			err = fmt.Errorf("failed to marshal configuration: %w", err)
+			return
+		}
+		if err = writer.WriteField("configuration", string(configuration)); err != nil {
 			err = fmt.Errorf("failed to write configuration field: %w", err)
 			return
 		}
 	}
-	// Add optional created_at field
+	// Add optional created_at field, keeping its nanoseconds and its zone
 	if req.CreatedAt != nil {
-		if err = writer.WriteField("created_at", *req.CreatedAt); err != nil {
+		if err = writer.WriteField("created_at", req.CreatedAt.Format(time.RFC3339Nano)); err != nil {
 			err = fmt.Errorf("failed to write created_at field: %w", err)
 			return
 		}
