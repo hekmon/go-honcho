@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"reflect"
+	"runtime"
 	"testing"
 	"time"
 )
@@ -81,6 +83,64 @@ func TestNewIdleConnTimeout(t *testing.T) {
 			t.Errorf("IdleConnTimeout = %v, want it left at %v", transport.IdleConnTimeout, idleConnTimeout)
 		}
 	})
+}
+
+// NewHTTPClient returns a new client on every call, with a transport of its own
+// set to go-honcho's defaults, and New uses such a client when its options hold
+// none.
+func TestNewHTTPClient(t *testing.T) {
+	first, second := NewHTTPClient(), NewHTTPClient()
+	if first == second {
+		t.Errorf("two calls returned the same client %p", first)
+	}
+	if first.Transport == second.Transport {
+		t.Errorf("two calls returned clients sharing the transport %p", first.Transport)
+	}
+
+	tests := []struct {
+		name   string
+		client *http.Client
+	}{
+		{name: "first call", client: first},
+		{name: "second call", client: second},
+		{name: "New with nil options", client: New(nil).http},
+		{name: "New with empty options", client: New(&Options{}).http},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.client.Transport == http.DefaultTransport {
+				t.Errorf("the client uses http.DefaultTransport")
+			}
+			transport, ok := tt.client.Transport.(*http.Transport)
+			if !ok {
+				t.Fatalf("the client's transport is a %T, want an *http.Transport", tt.client.Transport)
+			}
+			if reflect.ValueOf(transport.Proxy).Pointer() != reflect.ValueOf(http.ProxyFromEnvironment).Pointer() {
+				t.Errorf("Proxy is not http.ProxyFromEnvironment")
+			}
+			if transport.DialContext == nil {
+				t.Errorf("DialContext is not set")
+			}
+			if !transport.ForceAttemptHTTP2 {
+				t.Errorf("ForceAttemptHTTP2 = false, want true")
+			}
+			if want := 100; transport.MaxIdleConns != want {
+				t.Errorf("MaxIdleConns = %d, want %d", transport.MaxIdleConns, want)
+			}
+			if want := runtime.GOMAXPROCS(0) + 1; transport.MaxIdleConnsPerHost != want {
+				t.Errorf("MaxIdleConnsPerHost = %d, want %d", transport.MaxIdleConnsPerHost, want)
+			}
+			if want := 4 * time.Second; transport.IdleConnTimeout != want {
+				t.Errorf("IdleConnTimeout = %v, want %v", transport.IdleConnTimeout, want)
+			}
+			if want := 10 * time.Second; transport.TLSHandshakeTimeout != want {
+				t.Errorf("TLSHandshakeTimeout = %v, want %v", transport.TLSHandshakeTimeout, want)
+			}
+			if want := time.Second; transport.ExpectContinueTimeout != want {
+				t.Errorf("ExpectContinueTimeout = %v, want %v", transport.ExpectContinueTimeout, want)
+			}
+		})
+	}
 }
 
 // roundTripper is an http.RoundTripper of a function.

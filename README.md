@@ -14,7 +14,7 @@ Honcho is a memory layer for AI applications that enables persistent, contextual
 - **Comprehensive error handling** - Wrapped errors with context and error chain support
 - **Client-side validation** - Validate required fields and constraints before API calls
 - **Thread-safe** - Client instances are safe for concurrent use
-- **Minimal dependencies** - Only requires `go-cleanhttp` for HTTP client pooling
+- **No dependencies** - Nothing outside the Go standard library
 
 ## Installation
 
@@ -94,25 +94,25 @@ client := honcho.New(&honcho.Options{
 ### Custom HTTP Client
 
 ```go
-// Customize HTTP client settings (timeouts, transport, etc.)
+// Customize the HTTP client's transport (proxy, TLS settings, etc.)
 import (
     "net/http"
-    "time"
-
-    "github.com/hashicorp/go-cleanhttp"
+    "net/url"
 )
 
-// Start with cleanhttp.DefaultPooledClient() and modify as needed
-httpClient := cleanhttp.DefaultPooledClient()
-httpClient.Timeout = 30 * time.Second
-// Stay below the server's 5 second keep-alive: a POST sent on a connection the server is closing fails with EOF
-httpClient.Transport.(*http.Transport).IdleConnTimeout = 4 * time.Second
+// Start from honcho.NewHTTPClient(): it builds a new *http.Transport on every
+// call, so changing that transport affects only this client
+httpClient := honcho.NewHTTPClient()
+proxyURL, _ := url.Parse("http://proxy.example.com:8080")
+httpClient.Transport.(*http.Transport).Proxy = http.ProxyURL(proxyURL)
 
 client := honcho.New(&honcho.Options{
     APIKey: "your-api-key",
     HTTP:   httpClient,
 })
 ```
+
+`honcho.NewHTTPClient()` returns a new client on every call, with the settings `New` uses by default. Its transport lets go of an idle connection before Honcho's server closes it, after 5 seconds: a POST sent on a connection the server is closing fails with EOF. A client built from scratch must also keep its transport's `IdleConnTimeout` below 5 seconds. To bound a call, prefer a deadline on that call's context, set with `context.WithTimeout`, to the client's `Timeout`: `Client.Timeout` also cuts off a streamed answer still being read.
 
 ## API Categories
 
