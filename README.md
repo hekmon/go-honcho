@@ -152,11 +152,10 @@ workspace, err = client.UpdateWorkspace(ctx, "my-workspace", honcho.UpdateWorksp
 // Delete a workspace (must delete all sessions first)
 err = client.DeleteWorkspace(ctx, "my-workspace")
 
-// Search messages in a workspace (returns pointer to slice: *[]Message)
-result, err := client.SearchWorkspace(ctx, "my-workspace", honcho.WorkspaceMessageSearchOptions{
+// Search messages in a workspace (returns a slice: []Message)
+messages, err := client.SearchWorkspace(ctx, "my-workspace", honcho.WorkspaceMessageSearchOptions{
     Query: "important topic",
 })
-// result is *[]Message - dereference to access: messages := *result
 
 // Get queue status (optional: observerID, senderID, sessionID)
 status, err := client.GetQueueStatus(ctx, "my-workspace", nil, nil, nil)
@@ -709,33 +708,32 @@ The SDK uses Go pointers strategically to distinguish between "not set" and "set
 
 ### Return Types
 
-Most API methods return pointers to structs or slices:
+Most API methods return a pointer to a struct, or a slice when they return several objects:
 
 ```go
 // Single object returns *Type
 workspace, err := client.GetOrCreateWorkspace(ctx, req)  // *Workspace
 peer, err := client.GetOrCreatePeer(ctx, workspaceID, req)  // *Peer
 
-// Multiple object returns a slice ([]*Type or []Type) or a pointer to one (*[]Type)
-messages, err := client.SearchWorkspace(ctx, workspaceID, req)  // *[]Message
+// Multiple object returns a slice ([]*Type or []Type)
+messages, err := client.SearchWorkspace(ctx, workspaceID, req)  // []Message
 conclusions, err := client.QueryConclusions(ctx, workspaceID, req)  // []*Conclusion
 
 // Paginated returns *PageType
 sessions, err := client.GetSessions(ctx, workspaceID, req, opts)  // *PageSession
 ```
 
-**Working with pointer results:**
+**Working with results:**
 
 ```go
-// ✅ Dereference slice pointers to access elements
-result, err := client.SearchWorkspace(ctx, "workspace-id", honcho.WorkspaceMessageSearchOptions{
+// ✅ Range over slices directly (no dereference needed)
+messages, err := client.SearchWorkspace(ctx, "workspace-id", honcho.WorkspaceMessageSearchOptions{
     Query: "search query",
 })
 if err != nil {
     log.Fatal(err)
 }
-// result is *[]Message - dereference to access
-for _, msg := range *result {
+for _, msg := range messages {
     fmt.Println(msg.Content)
 }
 

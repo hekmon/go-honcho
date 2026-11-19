@@ -328,7 +328,7 @@ func (c *Client) GetSessionsForPeer(ctx context.Context, workspaceID, peerID str
 // SearchPeer searches a Peer's messages, optionally filtered by various criteria.
 //
 // https://docs.honcho.dev/v3/api-reference/endpoint/peers/search-peer
-func (c *Client) SearchPeer(ctx context.Context, workspaceID, peerID string, req MessageSearchOptions) (result *[]Message, err error) {
+func (c *Client) SearchPeer(ctx context.Context, workspaceID, peerID string, req MessageSearchOptions) (result []Message, err error) {
 	if workspaceID == "" {
 		err = errors.New("workspaceID is required")
 		return
@@ -344,7 +344,6 @@ func (c *Client) SearchPeer(ctx context.Context, workspaceID, peerID string, req
 	if err != nil {
 		return
 	}
-	result = new([]Message)
 	if _, err = c.request(
 		ctx, http.MethodPost, requestURL, nil,
 		req, &result,

@@ -653,7 +653,7 @@ if _, err = c.request(ctx, http.MethodGet, requestURL, nil, nil, &result); err !
 }
 // result is now populated with JSON-decoded data
 
-// ✅ Array response - use slice pointer
+// ✅ Array response - the result is a slice, not a pointer to one: pass its address
 result = make([]*Message, 0)
 if _, err = c.request(ctx, http.MethodPost, requestURL, nil, req, &result); err != nil {
     return
@@ -675,7 +675,7 @@ if _, err = c.request(ctx, http.MethodGet, requestURL, nil, nil, result); err !=
 
 **Response Type Guidelines:**
 - ✅ Use `new(Type)` for single object responses
-- ✅ Use `make([]*Type, 0, capacity)` for array responses (ensures JSON encodes as `[]` not `null`)
+- ✅ Use `make([]*Type, 0, capacity)` for array responses (ensures JSON encodes as `[]` not `null`): lists are returned as slices, not pointers to slices
 - ✅ Use `nil` for no response body (DELETE, some POST operations)
 - ✅ Use `*bytes.Buffer` for raw binary responses
 - ❌ Don't manually decode JSON responses (request() handles this)

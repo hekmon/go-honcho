@@ -926,6 +926,15 @@ func TestGetSessionsForPeerReverse(t *testing.T) {
 	}
 }
 
+// SearchPeer sends the query in a POST request to the peer's search path, decodes the messages of
+// the response into a slice of values, and returns no messages with an error. Regression test: it
+// returned a pointer to the slice, which callers had to dereference.
+func TestSearchPeerResponse(t *testing.T) {
+	checkSearchResponses(t, "/v3/workspaces/workspace/peers/alice/search", func(ctx context.Context, client *Client) ([]Message, error) {
+		return client.SearchPeer(ctx, "workspace", "alice", MessageSearchOptions{Query: searchQuery})
+	})
+}
+
 // peerFields are the fields of a peer in the shape of upstream's Peer schema, less its
 // configuration.
 const peerFields = `"id":"alice","uid":"yTkg0JNCYKPlmpuCQAfqn","workspace_id":"workspace","created_at":"2026-11-18T16:09:28.620049Z","metadata":{}`

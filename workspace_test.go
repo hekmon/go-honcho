@@ -1,6 +1,7 @@
 package honcho
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -689,4 +690,88 @@ func TestSearchWorkspaceRequest(t *testing.T) {
 			checkScopeRequest(t, received(), http.MethodPost, "/v3/workspaces/workspace/search", url.Values{}, tt.wantBody)
 		})
 	}
+}
+
+// searchQuery is the query the tests of the search responses send.
+const searchQuery = "Marzipan"
+
+// searchedMessagesJSON is a list of two messages in the shape of upstream's Message schema, as a
+// search route answers it.
+const searchedMessagesJSON = `[` +
+	`{"id":"m1","content":"My cat is called Marzipan.","peer_id":"alice","session_id":"home","metadata":{"mood":"happy"},"created_at":"2026-11-18T15:09:06.775938Z","workspace_id":"workspace","token_count":7},` +
+	`{"id":"m2","content":"Marzipan sleeps all day.","peer_id":"alice","session_id":"work","metadata":{},"created_at":"2026-11-18T16:12:40Z","workspace_id":"workspace","token_count":5}` +
+	`]`
+
+// searchedMessages returns what searchedMessagesJSON decodes to.
+func searchedMessages() []Message {
+	return []Message{
+		{
+			ID:          "m1",
+			Content:     "My cat is called Marzipan.",
+			PeerID:      "alice",
+			SessionID:   "home",
+			Metadata:    json.RawMessage(`{"mood":"happy"}`),
+			CreatedAt:   time.Date(2026, time.November, 18, 15, 9, 6, 775938000, time.UTC),
+			WorkspaceID: "workspace",
+			TokenCount:  7,
+		},
+		{
+			ID:          "m2",
+			Content:     "Marzipan sleeps all day.",
+			PeerID:      "alice",
+			SessionID:   "work",
+			Metadata:    json.RawMessage(`{}`),
+			CreatedAt:   time.Date(2026, time.November, 18, 16, 12, 40, 0, time.UTC),
+			WorkspaceID: "workspace",
+			TokenCount:  5,
+		},
+	}
+}
+
+// checkSearchResponses runs search, which must send searchQuery alone in a POST request to path,
+// against a server giving each response below, and reports an error unless the messages are
+// decoded into a slice of values, in the order the server sent them, a response holding no message
+// into an empty slice, and an error status into its error and no messages.
+func checkSearchResponses(t *testing.T, path string, search func(ctx context.Context, client *Client) ([]Message, error)) {
+	t.Helper()
+	tests := []struct {
+		name     string
+		status   int
+		response string
+		want     []Message
+		wantErr  bool
+	}{
+		{name: "messages", status: http.StatusOK, response: searchedMessagesJSON, want: searchedMessages()},
+		{name: "no message", status: http.StatusOK, response: `[]`, want: []Message{}},
+		{name: "error status", status: http.StatusNotFound, response: `{"detail":"Workspace workspace not found"}`, wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client, received := scopeServer(t, tt.status, tt.response)
+
+			messages, err := search(t.Context(), client)
+
+			if tt.wantErr && err == nil {
+				t.Error("error = nil, want an error")
+			}
+			if !tt.wantErr && err != nil {
+				t.Errorf("error = %v, want nil", err)
+			}
+			if !reflect.DeepEqual(messages, tt.want) {
+				got, _ := json.Marshal(messages)
+				want, _ := json.Marshal(tt.want)
+				t.Errorf("messages = %s, want %s", got, want)
+			}
+			checkScopeRequest(t, received(), http.MethodPost, path, url.Values{}, `{"query":"`+searchQuery+`"}`)
+		})
+	}
+}
+
+// SearchWorkspace decodes the messages of the response into a slice of values, and returns no
+// messages with an error. Regression test: it returned a pointer to the slice, which callers had
+// to dereference.
+func TestSearchWorkspaceResponse(t *testing.T) {
+	checkSearchResponses(t, "/v3/workspaces/workspace/search", func(ctx context.Context, client *Client) ([]Message, error) {
+		return client.SearchWorkspace(ctx, "workspace", WorkspaceMessageSearchOptions{Query: searchQuery})
+	})
 }

@@ -217,7 +217,7 @@ func (c *Client) ScheduleDream(ctx context.Context, workspaceID string, req Sche
 // returns no results.
 //
 // https://docs.honcho.dev/v3/api-reference/endpoint/workspaces/search-workspace
-func (c *Client) SearchWorkspace(ctx context.Context, workspaceID string, req WorkspaceMessageSearchOptions) (result *[]Message, err error) {
+func (c *Client) SearchWorkspace(ctx context.Context, workspaceID string, req WorkspaceMessageSearchOptions) (result []Message, err error) {
 	if workspaceID == "" {
 		err = errors.New("workspaceID is required")
 		return
@@ -229,7 +229,6 @@ func (c *Client) SearchWorkspace(ctx context.Context, workspaceID string, req Wo
 	if err != nil {
 		return
 	}
-	result = new([]Message)
 	if _, err = c.request(
 		ctx, http.MethodPost, requestURL, nil,
 		req, &result,
