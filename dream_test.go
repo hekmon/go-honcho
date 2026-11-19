@@ -3,7 +3,6 @@ package honcho
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -47,7 +46,6 @@ func capturedDreamRun() DreamRun {
 // sent as a JSON null, which the route reads as no options, and nil options leave the
 // query empty.
 func TestListDreamsRequest(t *testing.T) {
-	filters := map[string]any{"started_at": map[string]any{"gte": "2026-01-01"}}
 	tests := []struct {
 		name      string
 		req       *DreamRunList
@@ -78,17 +76,11 @@ func TestListDreamsRequest(t *testing.T) {
 			wantBody:  map[string]any{"observer_id": "bob"},
 		},
 		{
-			name:      "filters only",
-			req:       &DreamRunList{Filters: filters},
-			wantQuery: url.Values{},
-			wantBody:  map[string]any{"filters": filters},
-		},
-		{
 			name:      "every field",
-			req:       &DreamRunList{ObservedID: pointerTo("alice"), ObserverID: pointerTo("bob"), Filters: filters},
+			req:       &DreamRunList{ObservedID: pointerTo("alice"), ObserverID: pointerTo("bob")},
 			opts:      &ListDreamsOptions{Page: 3, Size: 10},
 			wantQuery: url.Values{"page": {"3"}, "size": {"10"}},
-			wantBody:  map[string]any{"observed_id": "alice", "observer_id": "bob", "filters": filters},
+			wantBody:  map[string]any{"observed_id": "alice", "observer_id": "bob"},
 		},
 	}
 	for _, tt := range tests {
@@ -155,33 +147,6 @@ func TestListDreamsDecodesPage(t *testing.T) {
 		got, _ := json.Marshal(page)
 		wanted, _ := json.Marshal(want)
 		t.Errorf("page = %s, want %s", got, wanted)
-	}
-}
-
-// A filter on a column Honcho cannot filter on comes back as an error matching
-// *HTTPValidationError, holding the text detail of the 422 response.
-func TestListDreamsUnknownFilterColumn(t *testing.T) {
-	const detail = "Column 'unknown' is not allowed to be filtered on or does not exist on DreamRun"
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusUnprocessableEntity)
-		fmt.Fprintf(w, `{"detail":%q}`, detail)
-	}))
-	defer server.Close()
-	u, _ := url.Parse(server.URL)
-
-	req := &DreamRunList{Filters: map[string]any{"unknown": "value"}}
-	_, err := New(&Options{BaseURL: u}).ListDreams(t.Context(), "workspace", req, nil)
-
-	var validationErr *HTTPValidationError
-	if !errors.As(err, &validationErr) {
-		t.Fatalf("error = %v, want it to match %T", err, validationErr)
-	}
-	if validationErr.Message != detail {
-		t.Errorf("Message = %q, want %q", validationErr.Message, detail)
-	}
-	if !strings.HasPrefix(err.Error(), "failed to list dreams: ") {
-		t.Errorf("error = %q, want it prefixed with %q", err, "failed to list dreams: ")
 	}
 }
 

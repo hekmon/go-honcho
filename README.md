@@ -481,14 +481,11 @@ page, err := client.ListDreams(ctx, "workspace-id", nil, &honcho.ListDreamsOptio
     Size: 20,
 })
 
-// List the runs of one representation that started in a date range
+// List the runs of one representation
 observedID, observerID := "user-123", "user-456"
 page, err = client.ListDreams(ctx, "workspace-id", &honcho.DreamRunList{
     ObservedID: &observedID,
     ObserverID: &observerID,
-    Filters: map[string]any{
-        "started_at": map[string]any{"gte": "2026-01-01"},
-    },
 }, nil)
 
 // Get one run with every change it committed

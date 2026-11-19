@@ -31,17 +31,14 @@ const (
 	DreamConclusionStatusUnavailable DreamConclusionStatus = "unavailable"
 )
 
-// DreamRunList represents the request body for listing dream runs with filters
-// Use nil for no filters
+// DreamRunList represents the request body for listing dream runs: the optional observed and
+// observer peers. Use nil to list every run
 type DreamRunList struct {
 	// ObservedID keeps only the runs about this peer (optional)
 	ObservedID *string `json:"observed_id,omitempty"`
 	// ObserverID keeps only the runs from this observer's perspective (optional). Combine it with
 	// ObservedID for one representation
 	ObserverID *string `json:"observer_id,omitempty"`
-	// Filters is the filter object, e.g. {"started_at": {"gte": "2026-01-01"}} (optional). Filterable
-	// fields: started_at, finished_at, observer_id, observed_id. Combined with ObservedID and ObserverID by AND
-	Filters map[string]any `json:"filters,omitempty"`
 }
 
 // ListDreamsOptions represents optional parameters for ListDreams

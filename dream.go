@@ -10,13 +10,12 @@ import (
 
 // ListDreams lists dream runs, newest first.
 //
-// Results are paginated. Each run records what one dream changed in a representation.
+// Each run records what one dream changed in a representation.
 // Filter by `observed_id` for a peer's history, and add `observer_id` for a single
-// representation. `filters` takes the shared filter object, e.g.
-// `{"started_at": {"gte": "2026-01-01"}}` for the runs that started in a date range.
-// Runs are not pruned unless the server sets a retention window.
+// representation. Runs are not pruned unless the server sets a retention window.
 //
-// Honcho answers 422 for a filter on a column it cannot filter on.
+// The runs can be narrowed only by observed and observer peer, as Honcho v3.6.1 has no
+// filter object on this route.
 //
 // The list is paginated by page number, or by cursor when opts.Cursor is set.
 //
