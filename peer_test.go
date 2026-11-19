@@ -45,11 +45,18 @@ func streamingClient(t *testing.T, stream string) *Client {
 	return New(&Options{BaseURL: u})
 }
 
-// collectChatStream ranges over a ChatStream to its end and returns the chunks
-// and the errors it yielded. An error must come alone, and last.
+// collectChatStream ranges over a ChatStream of a plain query to its end and returns
+// the chunks and the errors it yielded, as collectChatStreamRequest does.
 func collectChatStream(t *testing.T, client *Client) (chunks []string, errs []error) {
 	t.Helper()
-	for chunk, err := range client.ChatStream(t.Context(), "workspace", "alice", DialecticOptions{Query: "What is my cat's name?"}) {
+	return collectChatStreamRequest(t, client, DialecticOptions{Query: "What is my cat's name?"})
+}
+
+// collectChatStreamRequest ranges over a ChatStream of the request to its end and
+// returns the chunks and the errors it yielded. An error must come alone, and last.
+func collectChatStreamRequest(t *testing.T, client *Client, req DialecticOptions) (chunks []string, errs []error) {
+	t.Helper()
+	for chunk, err := range client.ChatStream(t.Context(), "workspace", "alice", req) {
 		if len(errs) > 0 {
 			t.Errorf("yielded (%q, %v) after the error %v", chunk, err, errs[0])
 		}
@@ -546,6 +553,174 @@ func TestChatNotStreamed(t *testing.T) {
 	}
 	if strings.Contains(body, "stream") {
 		t.Errorf("body = %s, want it without the stream field", body)
+	}
+}
+
+const (
+	// chatSchema is the response format the peer chat tests ask for: an object holding a name.
+	chatSchema = `{"type":"object","properties":{"name":{"type":"string"}},"required":["name"]}`
+	// chatEvidence is the evidence of an answer to a peer chat, in the form a Honcho server sends it.
+	chatEvidence = `{"conclusions":[{"id":"conclusion","level":"explicit","content":"alice has a cat named Marzipan.","created_at":"2026-11-18T15:09:06Z","session_id":"home","observer_id":"alice","observed_id":"alice","source_ids":[]}],"messages":[{"id":"message","session_id":"home","peer_id":"alice","created_at":"2026-11-18T15:09:06.775938Z"}],"tool_calls":[{"tool_name":"search","tool_input":{"query":"cat"}}],"reasoning_trace_id":null}`
+)
+
+// Chat sends the response format and the request for evidence when they are set, and
+// leaves both out when they are not, so the server applies its defaults: a free-text
+// answer, without evidence.
+func TestChatRequest(t *testing.T) {
+	tests := []struct {
+		name string
+		req  DialecticOptions
+		want string
+	}{
+		{
+			name: "neither set",
+			req:  DialecticOptions{Query: "What is my cat's name?"},
+			want: `{"query":"What is my cat's name?"}`,
+		},
+		{
+			name: "response format and evidence",
+			req: DialecticOptions{
+				Query:           "What is my cat's name?",
+				ResponseFormat:  json.RawMessage(chatSchema),
+				IncludeEvidence: true,
+			},
+			want: `{
+				"query": "What is my cat's name?",
+				"response_format": {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]},
+				"include_evidence": true
+			}`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client, received := scopeServer(t, http.StatusOK, `{"content":"Your cat's name is **Marzipan**.","evidence":null}`)
+
+			if _, err := client.Chat(t.Context(), "workspace", "alice", tt.req); err != nil {
+				t.Fatalf("Chat() error = %v, want nil", err)
+			}
+
+			checkScopeRequest(t, received(), http.MethodPost, "/v3/workspaces/workspace/peers/alice/chat", url.Values{}, tt.want)
+		})
+	}
+}
+
+// Chat decodes the evidence of the answer when it asks for it, and returns an answer in a
+// requested response format as the JSON string the server sent, the two together as well.
+// An answer without evidence decodes to a nil Evidence. The workspace chat tests check the
+// decoding of every field of the evidence.
+func TestChatResponse(t *testing.T) {
+	tests := []struct {
+		name     string
+		req      DialecticOptions
+		response string
+		// wantContent is the content of the answer
+		wantContent string
+		// wantEvidence is whether the answer holds the evidence of chatEvidence
+		wantEvidence bool
+	}{
+		{
+			name:         "evidence",
+			req:          DialecticOptions{Query: "What is my cat's name?", IncludeEvidence: true},
+			response:     `{"content":"Your cat's name is **Marzipan**.","evidence":` + chatEvidence + `}`,
+			wantContent:  "Your cat's name is **Marzipan**.",
+			wantEvidence: true,
+		},
+		{
+			name:        "response format",
+			req:         DialecticOptions{Query: "What is my cat's name?", ResponseFormat: json.RawMessage(chatSchema)},
+			response:    `{"content":"{\"name\":\"Marzipan\"}","evidence":null}`,
+			wantContent: `{"name":"Marzipan"}`,
+		},
+		{
+			name: "response format and evidence",
+			req: DialecticOptions{
+				Query:           "What is my cat's name?",
+				ResponseFormat:  json.RawMessage(chatSchema),
+				IncludeEvidence: true,
+			},
+			response:     `{"content":"{\"name\":\"Marzipan\"}","evidence":` + chatEvidence + `}`,
+			wantContent:  `{"name":"Marzipan"}`,
+			wantEvidence: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client, _ := scopeServer(t, http.StatusOK, tt.response)
+
+			result, err := client.Chat(t.Context(), "workspace", "alice", tt.req)
+			if err != nil {
+				t.Fatalf("Chat() error = %v, want nil", err)
+			}
+
+			if result.Content == nil || *result.Content != tt.wantContent {
+				t.Errorf("Content = %v, want %q", result.Content, tt.wantContent)
+			}
+			evidence := result.Evidence
+			if !tt.wantEvidence {
+				if evidence != nil {
+					t.Errorf("Evidence = %+v, want nil", evidence)
+				}
+				return
+			}
+			if evidence == nil {
+				t.Fatal("Evidence = nil, want the evidence of the answer")
+			}
+			if len(evidence.Conclusions) != 1 || len(evidence.Messages) != 1 || len(evidence.ToolCalls) != 1 {
+				t.Fatalf("evidence holds %d conclusions, %d messages and %d tool calls, want one of each",
+					len(evidence.Conclusions), len(evidence.Messages), len(evidence.ToolCalls))
+			}
+			if got, want := evidence.Conclusions[0].Content, "alice has a cat named Marzipan."; got != want {
+				t.Errorf("conclusion Content = %q, want %q", got, want)
+			}
+		})
+	}
+}
+
+// ChatStream sends the response format along with the request for a stream, and yields
+// the JSON document of the answer in the pieces the server streamed it in, split anywhere
+// as a real model splits it: joined, they are the whole document.
+func TestChatStreamResponseFormat(t *testing.T) {
+	const document = `{"name": "Marzipan"}`
+	pieces := []string{`{"`, `name`, `":`, ` "`, `Marz`, `ipan`, `"}`}
+	stream := ""
+	for _, piece := range pieces {
+		stream += deltaFrame(piece)
+	}
+	client, received := scopeServer(t, http.StatusOK, stream+finalFrame)
+
+	chunks, errs := collectChatStreamRequest(t, client, DialecticOptions{Query: "What is my cat's name?", ResponseFormat: json.RawMessage(chatSchema)})
+
+	if len(errs) != 0 {
+		t.Errorf("errors = %v, want none", errs)
+	}
+	if !slices.Equal(chunks, pieces) {
+		t.Errorf("chunks = %q, want %q", chunks, pieces)
+	}
+	if got := strings.Join(chunks, ""); got != document {
+		t.Errorf("chunks joined = %q, want %q", got, document)
+	}
+	checkScopeRequest(t, received(), http.MethodPost, "/v3/workspaces/workspace/peers/alice/chat", url.Values{}, `{
+		"query": "What is my cat's name?",
+		"response_format": {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]},
+		"stream": true
+	}`)
+}
+
+// ChatStream has no way to return evidence: it refuses to be asked for it with a single
+// error pointing to Chat, and sends no request.
+func TestChatStreamRefusesEvidence(t *testing.T) {
+	client, received := scopeServer(t, http.StatusOK, deltaFrame("Marzipan")+finalFrame)
+
+	chunks, errs := collectChatStreamRequest(t, client, DialecticOptions{Query: "What is my cat's name?", IncludeEvidence: true})
+
+	if len(chunks) != 0 {
+		t.Errorf("chunks = %q, want none", chunks)
+	}
+	if len(errs) != 1 || !strings.Contains(errs[0].Error(), "use Chat instead") {
+		t.Errorf("errors = %v, want a single error naming Chat", errs)
+	}
+	if requests := received(); len(requests) != 0 {
+		t.Errorf("%d requests sent, want none", len(requests))
 	}
 }
 

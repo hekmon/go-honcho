@@ -246,6 +246,17 @@ type DialecticOptions struct {
 	Stream bool `json:"stream,omitempty"`
 	// ReasoningLevel is the level of reasoning to apply (default: low)
 	ReasoningLevel ReasoningLevel `json:"reasoning_level,omitempty"`
+	// ResponseFormat is an optional JSON Schema (root type "object") the response must conform to.
+	// When provided, the answer's content is a JSON string matching this schema. Only a conservative
+	// subset of JSON Schema is supported: the server answers a schema outside it, such as one whose
+	// root type is not object, with a 422. Constraint keywords (minItems, maxLength, ...) are only
+	// hints to the model, not enforced by the server
+	ResponseFormat json.RawMessage `json:"response_format,omitempty"`
+	// IncludeEvidence is whether the response includes an evidence object listing the conclusions and
+	// messages the agent read while answering, plus the tool calls it made (default: false). Evidence
+	// is collated from what the agent accessed; the model is never asked to cite anything, so evidence
+	// may over-report (accessed is not the same as used). ChatStream refuses it
+	IncludeEvidence bool `json:"include_evidence,omitempty"`
 }
 
 // Validate checks that mandatory fields are valid

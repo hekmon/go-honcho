@@ -393,6 +393,12 @@ func (c *Client) Chat(ctx context.Context, workspaceID, peerID string, req Diale
 // before finishing the answer: an iteration that ends without an error has read the
 // whole answer. Breaking out of the loop cancels the request.
 //
+// With ResponseFormat set, the chunks are pieces of a single JSON document, split
+// anywhere, to be joined before decoding.
+//
+// An iterator has no way to return evidence, so a request with IncludeEvidence set is
+// refused before anything is sent: use Chat to read the evidence.
+//
 //	for chunk, err := range client.ChatStream(ctx, workspaceID, peerID, req) {
 //		if err != nil {
 //			return err
@@ -410,6 +416,10 @@ func (c *Client) ChatStream(ctx context.Context, workspaceID, peerID string, req
 		}
 		if peerID == "" {
 			yield("", errors.New("peerID is required"))
+			return
+		}
+		if req.IncludeEvidence {
+			yield("", errors.New("include_evidence is not supported by ChatStream: use Chat instead"))
 			return
 		}
 		if err := req.Validate(); err != nil {

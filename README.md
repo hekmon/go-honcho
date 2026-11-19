@@ -264,7 +264,14 @@ response, err = client.Chat(ctx, "workspace-id", "user-123", honcho.DialecticOpt
     Scope: honcho.ScopeUnion("team-a", "team-b"),
 })
 
-// Stream the answer as it is generated
+// Ask for an answer matching a JSON Schema: *response.Content is then a JSON string
+response, err = client.Chat(ctx, "workspace-id", "user-123", honcho.DialecticOptions{
+    Query:           "What are this peer's hobbies?",
+    ResponseFormat:  json.RawMessage(`{"type":"object","properties":{"hobbies":{"type":"array"}}}`),
+    IncludeEvidence: true, // response.Evidence lists what the agent read
+})
+
+// Stream the answer as it is generated (evidence is only available through Chat)
 for chunk, err := range client.ChatStream(ctx, "workspace-id", "user-123", honcho.DialecticOptions{
     Query: "What does this peer prefer?",
 }) {
