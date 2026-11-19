@@ -134,25 +134,23 @@ The SDK is organized by API categories. Each category has its own methods and ty
 
 ```go
 // Get or create a workspace
-workspace, err := client.GetOrCreateWorkspace(honcho.CreateWorkspaceRequest{
+workspace, err := client.GetOrCreateWorkspace(ctx, honcho.CreateWorkspaceRequest{
     ID: "my-workspace",
 })
 
 // List all workspaces (paginated)
-workspaces, err := client.GetAllWorkspaces(honcho.WorkspaceGetRequest{}, &honcho.GetAllWorkspacesOptions{
+workspaces, err := client.GetAllWorkspaces(ctx, honcho.WorkspaceGetRequest{}, &honcho.GetAllWorkspacesOptions{
     Page: 1,
     Size: 50,
 })
 
 // Update workspace metadata
-workspace, err = client.UpdateWorkspace("my-workspace", honcho.UpdateWorkspaceRequest{
-    Metadata: map[string]any{
-        "environment": "production",
-    },
+workspace, err = client.UpdateWorkspace(ctx, "my-workspace", honcho.UpdateWorkspaceRequest{
+    Metadata: json.RawMessage(`{"environment": "production"}`),
 })
 
 // Delete a workspace (must delete all sessions first)
-err = client.DeleteWorkspace("my-workspace")
+err = client.DeleteWorkspace(ctx, "my-workspace")
 
 // Search messages in a workspace (returns pointer to slice: *[]Message)
 result, err := client.SearchWorkspace(ctx, "my-workspace", honcho.WorkspaceMessageSearchOptions{
@@ -161,15 +159,15 @@ result, err := client.SearchWorkspace(ctx, "my-workspace", honcho.WorkspaceMessa
 // result is *[]Message - dereference to access: messages := *result
 
 // Get queue status (optional: observerID, senderID, sessionID)
-status, err := client.GetQueueStatus("my-workspace", nil, nil, nil)
+status, err := client.GetQueueStatus(ctx, "my-workspace", nil, nil, nil)
 
 // Get queue status scoped to specific observer and session
 observerID := "user-123"
 sessionID := "session-456"
-status, err = client.GetQueueStatus("my-workspace", &observerID, nil, &sessionID)
+status, err = client.GetQueueStatus(ctx, "my-workspace", &observerID, nil, &sessionID)
 
 // Schedule a dream task
-err = client.ScheduleDream("my-workspace", honcho.ScheduleDreamRequest{
+err = client.ScheduleDream(ctx, "my-workspace", honcho.ScheduleDreamRequest{
     Observer:  "user-123",
     DreamType: honcho.DreamTypeOmni,
 })
@@ -196,58 +194,54 @@ for chunk, err := range client.WorkspaceChatStream(ctx, "my-workspace", honcho.W
 
 ```go
 // Create or get a peer
-peer, err := client.GetOrCreatePeer("workspace-id", honcho.PeerCreate{
-    ID: "user-123",
-    Metadata: map[string]any{
-        "name": "Alice",
-    },
+peer, err := client.GetOrCreatePeer(ctx, "workspace-id", honcho.PeerCreate{
+    ID:       "user-123",
+    Metadata: json.RawMessage(`{"name": "Alice"}`),
 })
 
 // Get peer representation
-rep, err := client.GetRepresentation("workspace-id", "user-123", honcho.PeerRepresentationGet{
+rep, err := client.GetRepresentation(ctx, "workspace-id", "user-123", honcho.PeerRepresentationGet{
     // Optional fields for scoping
 })
 
 // Get peer card
-card, err := client.GetPeerCard("workspace-id", "user-123", nil)
+card, err := client.GetPeerCard(ctx, "workspace-id", "user-123", nil)
 
 // Set peer card
-card, err = client.SetPeerCard("workspace-id", "user-123", honcho.PeerCardSet{
-    Card: "peer card content",
+card, err = client.SetPeerCard(ctx, "workspace-id", "user-123", honcho.PeerCardSet{
+    PeerCard: []string{"Name: Alice", "Prefers email communication"},
 }, nil)
 
 // Get peer context (for RAG/retrieval)
 searchTopK := 5
-context, err := client.GetPeerContext("workspace-id", "user-123", &honcho.GetPeerContextOptions{
+context, err := client.GetPeerContext(ctx, "workspace-id", "user-123", &honcho.GetPeerContextOptions{
     SearchTopK: &searchTopK,
 })
 
 // Get all peers (paginated)
-peers, err := client.GetAllPeers("workspace-id", nil, &honcho.GetAllPeersOptions{
+peers, err := client.GetAllPeers(ctx, "workspace-id", nil, &honcho.GetAllPeersOptions{
     Page: 1,
     Size: 20,
 })
 
 // Update peer metadata
-peer, err = client.UpdatePeer("workspace-id", "user-123", honcho.PeerUpdate{
-    Metadata: map[string]any{
-        "name": "Alice Smith",
-    },
+peer, err = client.UpdatePeer(ctx, "workspace-id", "user-123", honcho.PeerUpdate{
+    Metadata: json.RawMessage(`{"name": "Alice Smith"}`),
 })
 
 // Get sessions for a peer
-sessions, err := client.GetSessionsForPeer("workspace-id", "user-123", nil, &honcho.GetSessionsForPeerOptions{
+sessions, err := client.GetSessionsForPeer(ctx, "workspace-id", "user-123", nil, &honcho.GetSessionsForPeerOptions{
     Page: 1,
     Size: 20,
 })
 
 // Search peer's messages
-messages, err := client.SearchPeer("workspace-id", "user-123", honcho.MessageSearchOptions{
+messages, err := client.SearchPeer(ctx, "workspace-id", "user-123", honcho.MessageSearchOptions{
     Query: "search query",
 })
 
 // Chat with peer's representation
-response, err := client.Chat("workspace-id", "user-123", honcho.DialecticOptions{
+response, err := client.Chat(ctx, "workspace-id", "user-123", honcho.DialecticOptions{
     Query: "What does this peer prefer?",
 })
 
@@ -286,48 +280,44 @@ for chunk, err := range client.ChatStream(ctx, "workspace-id", "user-123", honch
 
 ```go
 // Create or get a session
-session, err := client.GetOrCreateSession("workspace-id", honcho.SessionCreate{
-    ID: "my-session",
-    Metadata: map[string]any{
-        "topic": "Customer Support",
-    },
+session, err := client.GetOrCreateSession(ctx, "workspace-id", honcho.SessionCreate{
+    ID:       "my-session",
+    Metadata: json.RawMessage(`{"topic": "Customer Support"}`),
 })
 
 // Get sessions (paginated) - pass nil for req when no filters needed
-sessions, err := client.GetSessions("workspace-id", nil, &honcho.GetSessionsOptions{
+sessions, err := client.GetSessions(ctx, "workspace-id", nil, &honcho.GetSessionsOptions{
     Page: 1,
     Size: 20,
 })
 
 // Get sessions with filters
-sessions, err = client.GetSessions("workspace-id", &honcho.WorkspaceSessionGet{
-    Filters: map[string]any{"status": "active"},
+sessions, err = client.GetSessions(ctx, "workspace-id", &honcho.WorkspaceSessionGet{
+    Filters: map[string]any{"is_active": true},
 }, &honcho.GetSessionsOptions{
     Page: 1,
     Size: 20,
 })
 
 // Update session metadata
-session, err = client.UpdateSession("workspace-id", "session-id", honcho.SessionUpdate{
-    Metadata: map[string]any{
-        "topic": "Updated Topic",
-    },
+session, err = client.UpdateSession(ctx, "workspace-id", "session-id", honcho.SessionUpdate{
+    Metadata: json.RawMessage(`{"topic": "Updated Topic"}`),
 })
 
 // Delete a session
-err = client.DeleteSession("workspace-id", "session-id")
+err = client.DeleteSession(ctx, "workspace-id", "session-id")
 
 // Clone a session
-cloned, err := client.CloneSession("workspace-id", "session-id", nil)
+cloned, err := client.CloneSession(ctx, "workspace-id", "session-id", nil)
 
 // Clone up to a specific message
 messageID := "msg-123"
-cloned, err = client.CloneSession("workspace-id", "session-id", &honcho.CloneSessionOptions{
+cloned, err = client.CloneSession(ctx, "workspace-id", "session-id", &honcho.CloneSessionOptions{
     MessageID: &messageID,
 })
 
 // Get session peers
-pagePeer, err := client.GetSessionPeers("workspace-id", "session-id", &honcho.GetSessionPeersOptions{
+pagePeer, err := client.GetSessionPeers(ctx, "workspace-id", "session-id", &honcho.GetSessionPeersOptions{
     Page: 1,
     Size: 10,
 })
@@ -339,64 +329,62 @@ peers := map[string]*honcho.SessionPeerConfig{
         ObserveMe: &observeMe,
     },
 }
-session, err = client.SetSessionPeers("workspace-id", "session-id", peers)
+session, err = client.SetSessionPeers(ctx, "workspace-id", "session-id", peers)
 
 // Add peers to session
-session, err = client.AddPeersToSession("workspace-id", "session-id", peers)
+session, err = client.AddPeersToSession(ctx, "workspace-id", "session-id", peers)
 
 // Remove peers from session
-err = client.RemovePeersFromSession("workspace-id", "session-id", []string{"user-123"})
+session, err = client.RemovePeersFromSession(ctx, "workspace-id", "session-id", []string{"user-123"})
 
 // Get session context
 tokens := 1000
-context, err := client.GetSessionContext("workspace-id", "session-id", &honcho.GetSessionContextOptions{
+context, err := client.GetSessionContext(ctx, "workspace-id", "session-id", &honcho.GetSessionContextOptions{
     Tokens: &tokens,
 })
 
 // Get session summaries
-summaries, err := client.GetSessionSummaries("workspace-id", "session-id")
+summaries, err := client.GetSessionSummaries(ctx, "workspace-id", "session-id")
 
 // Search session messages
-messages, err := client.SearchSession("workspace-id", "session-id", honcho.MessageSearchOptions{
+messages, err := client.SearchSession(ctx, "workspace-id", "session-id", honcho.MessageSearchOptions{
     Query: "search query",
 })
 
 // Get peer config in session
-config, err := client.GetPeerConfig("workspace-id", "session-id", "user-123")
+config, err := client.GetPeerConfig(ctx, "workspace-id", "session-id", "user-123")
 
 // Set peer config in session
-observeMe := true
-err = client.SetPeerConfig("workspace-id", "session-id", "user-123", honcho.SessionPeerConfig{
+observeMe = true
+err = client.SetPeerConfig(ctx, "workspace-id", "session-id", "user-123", honcho.SessionPeerConfig{
     ObserveMe: &observeMe,
 })
 
 // Get session summaries (short and long)
-summaries, err := client.GetSessionSummaries("workspace-id", "session-id")
+summaries, err = client.GetSessionSummaries(ctx, "workspace-id", "session-id")
 ```
 
 ### Message Operations
 
 ```go
 // Create messages for a session
-messages, err := client.CreateMessagesForSession("workspace-id", "session-id", honcho.MessageBatchCreate{
+messages, err := client.CreateMessagesForSession(ctx, "workspace-id", "session-id", honcho.MessageBatchCreate{
     Messages: []honcho.MessageCreate{
         {
             PeerID:  "user-123",
             Content: "Hello, how can I help?",
-            IsUser:  true,
         },
         {
             PeerID:  "assistant-1",
             Content: "I need help with my account.",
-            IsUser:  false,
         },
     },
 })
 
 // Create messages with file upload
 fileContent := []byte("file content here")
-metadata := "optional metadata"
-messages, err = client.CreateMessagesWithFile("workspace-id", "session-id", honcho.MessageUpload{
+metadata := `{"source": "upload"}` // optional, a JSON object as text
+messages, err = client.CreateMessagesWithFile(ctx, "workspace-id", "session-id", honcho.MessageUpload{
     File:     fileContent,
     Filename: "document.txt",
     PeerID:   "user-123",
@@ -404,16 +392,16 @@ messages, err = client.CreateMessagesWithFile("workspace-id", "session-id", honc
 })
 
 // Get a single message
-message, err := client.GetMessage("workspace-id", "session-id", "message-id")
+message, err := client.GetMessage(ctx, "workspace-id", "session-id", "message-id")
 
 // Get messages (paginated) - pass nil for req when no filters needed
-page, err := client.GetMessages("workspace-id", "session-id", nil, &honcho.GetMessagesOptions{
+page, err := client.GetMessages(ctx, "workspace-id", "session-id", nil, &honcho.GetMessagesOptions{
     Page: 1,
     Size: 50,
 })
 
 // Get messages with filters
-page, err = client.GetMessages("workspace-id", "session-id", &honcho.MessageGet{
+page, err = client.GetMessages(ctx, "workspace-id", "session-id", &honcho.MessageGet{
     Filters: map[string]any{"peer_id": "user-123"},
 }, &honcho.GetMessagesOptions{
     Page: 1,
@@ -421,10 +409,8 @@ page, err = client.GetMessages("workspace-id", "session-id", &honcho.MessageGet{
 })
 
 // Update message metadata
-message, err = client.UpdateMessage("workspace-id", "session-id", "message-id", honcho.MessageUpdate{
-    Metadata: map[string]any{
-        "flagged": true,
-    },
+message, err = client.UpdateMessage(ctx, "workspace-id", "session-id", "message-id", honcho.MessageUpdate{
+    Metadata: json.RawMessage(`{"flagged": true}`),
 })
 ```
 
@@ -432,7 +418,7 @@ message, err = client.UpdateMessage("workspace-id", "session-id", "message-id", 
 
 ```go
 // Create conclusions
-conclusions, err := client.CreateConclusions("workspace-id", honcho.ConclusionBatchCreate{
+conclusions, err := client.CreateConclusions(ctx, "workspace-id", honcho.ConclusionBatchCreate{
     Conclusions: []honcho.ConclusionCreate{
         {
             ObserverID: "user-123",
@@ -443,14 +429,14 @@ conclusions, err := client.CreateConclusions("workspace-id", honcho.ConclusionBa
 })
 
 // List conclusions (paginated) - pass nil for req when no filters needed
-page, err := client.ListConclusions("workspace-id", nil, &honcho.ListConclusionsOptions{
+page, err := client.ListConclusions(ctx, "workspace-id", nil, &honcho.ListConclusionsOptions{
     Page:    1,
     Size:    20,
     Reverse: false, // Order direction (default: false)
 })
 
 // List conclusions with filters
-page, err = client.ListConclusions("workspace-id", &honcho.ConclusionGet{
+page, err = client.ListConclusions(ctx, "workspace-id", &honcho.ConclusionGet{
     Filters: map[string]any{"observer_id": "user-123"},
 }, &honcho.ListConclusionsOptions{
     Page: 1,
@@ -458,7 +444,7 @@ page, err = client.ListConclusions("workspace-id", &honcho.ConclusionGet{
 })
 
 // Query conclusions (semantic search)
-conclusions, err = client.QueryConclusions("workspace-id", honcho.ConclusionQuery{
+conclusions, err = client.QueryConclusions(ctx, "workspace-id", honcho.ConclusionQuery{
     Query: "communication preferences",
     TopK:  10,
     // Required: name the observer (observer or observer_id) and the observed peer (observed or observed_id)
@@ -469,7 +455,7 @@ conclusions, err = client.QueryConclusions("workspace-id", honcho.ConclusionQuer
 conclusion, err := client.GetConclusion(ctx, "workspace-id", "conclusion-id")
 
 // Delete a conclusion
-err = client.DeleteConclusion("workspace-id", "conclusion-id")
+err = client.DeleteConclusion(ctx, "workspace-id", "conclusion-id")
 ```
 
 ### Dream Operations
@@ -548,40 +534,40 @@ err = client.RemoveSessionFromScope(ctx, "workspace-id", "team", "session-1")
 
 ```go
 // Get or create a webhook endpoint
-webhook, err := client.GetOrCreateWebhookEndpoint("workspace-id", honcho.WebhookEndpointCreate{
+webhook, err := client.GetOrCreateWebhookEndpoint(ctx, "workspace-id", honcho.WebhookEndpointCreate{
     URL: "https://example.com/webhook",
 })
 
 // List webhook endpoints
-page, err := client.ListWebhookEndpoints("workspace-id", &honcho.ListWebhookEndpointsOptions{
+page, err := client.ListWebhookEndpoints(ctx, "workspace-id", &honcho.ListWebhookEndpointsOptions{
     Page: 1,
     Size: 10,
 })
 
 // Delete a webhook endpoint
-err = client.DeleteWebhookEndpoint("workspace-id", "endpoint-id")
+err = client.DeleteWebhookEndpoint(ctx, "workspace-id", "endpoint-id")
 
 // Test webhook emission
-err = client.TestEmit("workspace-id")
+err = client.TestEmit(ctx, "workspace-id")
 ```
 
 ### API Key Operations
 
 ```go
 // Create an API key scoped to a workspace
-key, err := client.CreateKey(honcho.CreateKeyRequest{
+key, err := client.CreateKey(ctx, honcho.CreateKeyRequest{
     WorkspaceID: "workspace-id",
 })
 
 // Create an API key scoped to a peer
-key, err = client.CreateKey(honcho.CreateKeyRequest{
+key, err = client.CreateKey(ctx, honcho.CreateKeyRequest{
     WorkspaceID: "workspace-id",
     PeerID:      "user-123",
 })
 
 // Create an API key with expiration
 expiresAt := time.Now().Add(24 * time.Hour)
-key, err = client.CreateKey(honcho.CreateKeyRequest{
+key, err = client.CreateKey(ctx, honcho.CreateKeyRequest{
     WorkspaceID: "workspace-id",
     ExpiresAt:   &expiresAt,
 })
@@ -591,10 +577,10 @@ key, err = client.CreateKey(honcho.CreateKeyRequest{
 
 The SDK provides comprehensive error handling with context and error chain support:
 
-**Note on 202/204 Responses:** Some endpoints return `202 Accepted` (e.g., `DeleteSession`) or `204 No Content` (e.g., `DeleteWorkspace`, `DeleteWebhookEndpoint`). These methods return only an error - no result value is provided since the response body is empty.
+**Note on 202/204 Responses:** Some endpoints return `202 Accepted` (e.g., `DeleteSession`, `DeleteWorkspace`) or `204 No Content` (e.g., `DeleteWebhookEndpoint`). These methods return only an error - no result value is provided since the response body is empty.
 
 ```go
-workspace, err := client.GetOrCreateWorkspace(honcho.CreateWorkspaceRequest{
+workspace, err := client.GetOrCreateWorkspace(ctx, honcho.CreateWorkspaceRequest{
     ID: "my-workspace",
 })
 if err != nil {
@@ -631,7 +617,7 @@ The SDK performs client-side validation for required fields and constraints:
 
 ```go
 // Validation happens automatically when calling API methods
-workspace, err := client.GetOrCreateWorkspace(honcho.CreateWorkspaceRequest{
+workspace, err := client.GetOrCreateWorkspace(ctx, honcho.CreateWorkspaceRequest{
     ID: "", // Will fail validation: "id is required"
 })
 
@@ -645,7 +631,7 @@ if err != nil {
 
 - **Required fields** - Must be provided (e.g., `ID`, `PeerID`)
 - **ID format** - Must contain only letters, numbers, underscores, or hyphens
-- **Length constraints** - IDs must be 512 characters or less
+- **Length constraints** - IDs must be 512 characters or less (506 for scopes)
 - **Numeric constraints** - Pagination and limits have min/max values
 
 ## Pagination
@@ -722,15 +708,15 @@ Most API methods return pointers to structs or slices:
 
 ```go
 // Single object returns *Type
-workspace, err := client.GetOrCreateWorkspace(req)  // *Workspace
-peer, err := client.GetOrCreatePeer(workspaceID, req)  // *Peer
+workspace, err := client.GetOrCreateWorkspace(ctx, req)  // *Workspace
+peer, err := client.GetOrCreatePeer(ctx, workspaceID, req)  // *Peer
 
-// Multiple object returns *[]Type (pointer to slice)
-messages, err := client.SearchWorkspace(workspaceID, req)  // *[]Message
-conclusions, err := client.QueryConclusions(workspaceID, req)  // *[]Conclusion
+// Multiple object returns a slice ([]*Type or []Type) or a pointer to one (*[]Type)
+messages, err := client.SearchWorkspace(ctx, workspaceID, req)  // *[]Message
+conclusions, err := client.QueryConclusions(ctx, workspaceID, req)  // []*Conclusion
 
 // Paginated returns *PageType
-sessions, err := client.GetSessions(workspaceID, req, opts)  // *PageSession
+sessions, err := client.GetSessions(ctx, workspaceID, req, opts)  // *PageSession
 ```
 
 **Working with pointer results:**
@@ -749,7 +735,7 @@ for _, msg := range *result {
 }
 
 // ✅ Access struct fields directly (no dereference needed)
-workspace, err := client.GetOrCreateWorkspace(honcho.CreateWorkspaceRequest{
+workspace, err := client.GetOrCreateWorkspace(ctx, honcho.CreateWorkspaceRequest{
     ID: "my-workspace",
 })
 fmt.Println(workspace.ID)  // workspace is *Workspace, field access auto-dereferences
@@ -762,13 +748,13 @@ fmt.Println(workspace.ID)  // workspace is *Workspace, field access auto-derefer
 ```go
 // ✅ Pointer distinguishes nil vs 0
 searchTopK := 5
-context, err := client.GetPeerContext("workspace-id", "peer-id", &honcho.GetPeerContextOptions{
+context, err := client.GetPeerContext(ctx, "workspace-id", "peer-id", &honcho.GetPeerContextOptions{
     SearchTopK: &searchTopK,  // nil = not provided, &value = explicitly set
 })
 
 // ✅ Pointer for bool when you need 3-way logic (configuration updates)
 observeMe := true
-err = client.SetPeerConfig("workspace-id", "session-id", "peer-id", honcho.SessionPeerConfig{
+err = client.SetPeerConfig(ctx, "workspace-id", "session-id", "peer-id", honcho.SessionPeerConfig{
     ObserveMe: &observeMe,  // nil = keep existing, true/false = change
 })
 ```
@@ -777,7 +763,7 @@ err = client.SetPeerConfig("workspace-id", "session-id", "peer-id", honcho.Sessi
 
 ```go
 // ✅ Value type with omitempty: 0 or false means "use server default"
-sessions, err := client.GetSessions("workspace-id", nil, &honcho.GetSessionsOptions{
+sessions, err := client.GetSessions(ctx, "workspace-id", nil, &honcho.GetSessionsOptions{
     Page:    1,     // 0 = use server default (1)
     Size:    50,    // 0 = use server default (50)
     Reverse: false, // false = use server default (false)
@@ -818,7 +804,7 @@ func init() {
 
 // Use the same client instance everywhere
 func handler(w http.ResponseWriter, r *http.Request) {
-    workspace, _ := client.GetOrCreateWorkspace(...)
+    workspace, _ := client.GetOrCreateWorkspace(r.Context(), ...)
 }
 ```
 
@@ -830,7 +816,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 
 ```go
 // ✅ Proper error handling
-workspace, err := client.GetOrCreateWorkspace(req)
+workspace, err := client.GetOrCreateWorkspace(ctx, req)
 if err != nil {
     var valErr *honcho.HTTPValidationError
     if errors.As(err, &valErr) {
@@ -850,7 +836,7 @@ if err != nil {
 
 ```go
 // ✅ Validation happens automatically
-workspace, err := client.GetOrCreateWorkspace(honcho.CreateWorkspaceRequest{
+workspace, err := client.GetOrCreateWorkspace(ctx, honcho.CreateWorkspaceRequest{
     ID: "valid-id-123",
 })
 ```
@@ -864,11 +850,11 @@ workspace, err := client.GetOrCreateWorkspace(honcho.CreateWorkspaceRequest{
 ```go
 // ✅ Safe for concurrent use
 go func() {
-    client.GetPeerContext(workspaceID, peerID, nil)
+    client.GetPeerContext(ctx, workspaceID, peerID, nil)
 }()
 
 go func() {
-    client.CreateMessagesForSession(workspaceID, sessionID, req)
+    client.CreateMessagesForSession(ctx, workspaceID, sessionID, req)
 }()
 ```
 
@@ -879,11 +865,11 @@ go func() {
 
 ```go
 // ✅ Pass nil when no filters needed
-sessions, err := client.GetSessions("workspace-id", nil, nil)
+sessions, err := client.GetSessions(ctx, "workspace-id", nil, nil)
 
 // ✅ Pass struct when filters are needed
-sessions, err := client.GetSessions("workspace-id", &honcho.WorkspaceSessionGet{
-    Filters: map[string]any{"status": "active"},
+sessions, err = client.GetSessions(ctx, "workspace-id", &honcho.WorkspaceSessionGet{
+    Filters: map[string]any{"is_active": true},
 }, nil)
 ```
 
@@ -894,7 +880,7 @@ Some optional fields use pointers to distinguish "not set" from "set to zero val
 ```go
 // ✅ Create pointer variables for *int, *string, *float64 fields
 searchTopK := 5
-context, err := client.GetPeerContext("workspace-id", "user-123", &honcho.GetPeerContextOptions{
+context, err := client.GetPeerContext(ctx, "workspace-id", "user-123", &honcho.GetPeerContextOptions{
     SearchTopK: &searchTopK,
 })
 

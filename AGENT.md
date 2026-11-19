@@ -125,7 +125,7 @@ go-honcho/
 
 Each API category gets its own pair of files:
 
-- `{category}.go` - Client methods only (e.g., `func (c *Client) GetWorkspace(...)`)
+- `{category}.go` - Client methods only (e.g., `func (c *Client) GetOrCreateWorkspace(...)`)
 - `{category}_types.go` - Type definitions only (structs can have their own methods like `Validate()`)
 
 **Example:** `workspace.go` / `workspace_types.go`, `peer.go` / `peer_types.go`
@@ -138,8 +138,9 @@ Each API category gets its own pair of files:
 // ✅ In workspace_types.go
 type Workspace struct {
     ID            string                  `json:"id"`
+    UID           string                  `json:"uid"`
     CreatedAt     time.Time               `json:"created_at"`
-    Metadata      map[string]any          `json:"metadata,omitempty"`
+    Metadata      json.RawMessage         `json:"metadata,omitempty"`
     Configuration *WorkspaceConfiguration `json:"configuration,omitempty"`
 }
 ```
@@ -150,7 +151,7 @@ type Workspace struct {
 
 ```go
 // ✅ In workspace.go
-func (c *Client) GetOrCreateWorkspace(req CreateWorkspaceRequest) (result *Workspace, err error) {
+func (c *Client) GetOrCreateWorkspace(ctx context.Context, req CreateWorkspaceRequest) (result *Workspace, err error) {
     // implementation
 }
 ```
@@ -161,12 +162,12 @@ func (c *Client) GetOrCreateWorkspace(req CreateWorkspaceRequest) (result *Works
 
 ```bash
 # ✅ Verify session types are in session_types.go
-grep "type Session" session_types.go  # Should find Session*, PageSession, etc.
-grep "type Session" session.go        # Should find nothing
+grep "type .*Session" session_types.go  # Should find Session*, PageSession, etc.
+grep "type .*Session" session.go        # Should find nothing
 
 # ✅ Verify peer types are in peer_types.go  
-grep "type Peer" peer_types.go  # Should find Peer*, PagePeer, etc.
-grep "type Peer" peer.go        # Should find nothing
+grep "type .*Peer" peer_types.go  # Should find Peer*, PagePeer, etc.
+grep "type .*Peer" peer.go        # Should find nothing
 ```
 
 **Shared types:** If a type is used by multiple categories (e.g., `MessageSearchOptions` for both peer and session search), place it in the **primary category** where it's defined in the API docs, or create a `shared_types.go` if used across 3+ categories.
@@ -185,7 +186,7 @@ grep "type Peer" peer.go        # Should find nothing
 ```go
 // ✅ Pointer distinguishes nil vs 0
 type GetPeerContextOptions struct {
-    SearchTopK *int `json:"search_top_k,omitempty"`  // nil = not provided, 0 = explicitly zero
+    SearchTopK *int  // nil = not provided, 0 = explicitly zero
 }
 
 // ✅ Pointer for bool when you need to tell unset apart from true or false (configuration fields)
@@ -321,7 +322,7 @@ import (
 // They form the basis of a Peer's Representation.
 //
 // https://docs.honcho.dev/v3/api-reference/endpoint/conclusions/create-conclusions
-func (c *Client) CreateConclusions(workspaceID string, req ConclusionBatchCreate) (result []*Conclusion, err error) {
+func (c *Client) CreateConclusions(ctx context.Context, workspaceID string, req ConclusionBatchCreate) (result []*Conclusion, err error) {
 ```
 
 **Block Comment Guidelines:**
@@ -343,13 +344,13 @@ func (c *Client) CreateConclusions(workspaceID string, req ConclusionBatchCreate
 // This endpoint triggers a test webhook event to verify the endpoint is configured correctly.
 //
 // https://docs.honcho.dev/v3/api-reference/endpoint/webhooks/test-emit
-func (c *Client) TestEmit(workspaceID string) (err error) {
+func (c *Client) TestEmit(ctx context.Context, workspaceID string) (err error) {
 
 // ❌ Bad: Missing descriptive second paragraph
 // TestEmit tests publishing a webhook event.
 //
 // https://docs.honcho.dev/v3/api-reference/endpoint/webhooks/test-emit
-func (c *Client) TestEmit(workspaceID string) (err error) {
+func (c *Client) TestEmit(ctx context.Context, workspaceID string) (err error) {
 ```
 
 ### Documentation Trick
@@ -450,7 +451,7 @@ Before finalizing a method, verify:
 ### Standard Method Structure
 
 ```go
-func (c *Client) MethodName(req RequestType) (result *ResultType, err error) {
+func (c *Client) MethodName(ctx context.Context, req RequestType) (result *ResultType, err error) {
     // 1. Validate mandatory parameters (ONLY if Validate() method exists)
     if err = req.Validate(); err != nil {
         return
@@ -466,7 +467,7 @@ func (c *Client) MethodName(req RequestType) (result *ResultType, err error) {
     result = new(ResultType)
     
     // 4. Make request
-    if _, err = c.request(http.MethodPost, requestURL, nil, req, &result); err != nil {
+    if _, err = c.request(ctx, http.MethodPost, requestURL, nil, req, &result); err != nil {
         err = fmt.Errorf("failed to execute request: %w", err)
         return
     }
@@ -485,11 +486,11 @@ func (c *Client) MethodName(req RequestType) (result *ResultType, err error) {
 ```go
 // ✅ Match the pattern used in similar methods (e.g., session.go)
 // When a method has both request body and options parameters:
-func (c *Client) GetSessions(workspaceID string, req *WorkspaceSessionGet, opts *GetSessionsOptions) (result *PageSession, err error)
-//                                          ^^^ request body first         ^^^^ options second
+func (c *Client) GetSessions(ctx context.Context, workspaceID string, req *WorkspaceSessionGet, opts *GetSessionsOptions) (result *PageSession, err error)
+//                                                                    ^^^ request body first    ^^^^ options second
 
 // ❌ Don't invent new parameter orderings - check existing methods first
-func (c *Client) GetSessions(workspaceID string, opts *GetSessionsOptions, req *WorkspaceSessionGet) // wrong order!
+func (c *Client) GetSessions(ctx context.Context, workspaceID string, opts *GetSessionsOptions, req *WorkspaceSessionGet) // wrong order!
 ```
 
 **Pattern:** Request body parameters come BEFORE optional query parameter structs. This matches the API structure (body is primary, query params are modifiers).
@@ -500,7 +501,7 @@ func (c *Client) GetSessions(workspaceID string, opts *GetSessionsOptions, req *
 
 ```go
 // ✅ Pass path parameters as separate string arguments
-func (c *Client) DeleteWorkspace(workspaceID string) (err error) {
+func (c *Client) DeleteWorkspace(ctx context.Context, workspaceID string) (err error) {
     if workspaceID == "" {
         err = errors.New("workspaceID is required")
         return
@@ -513,7 +514,7 @@ func (c *Client) DeleteWorkspace(workspaceID string) (err error) {
 }
 
 // ✅ Multiple path parameters
-func (c *Client) CreateMessagesWithFile(workspaceID, sessionID string, req MessageUpload) (result []*Message, err error) {
+func (c *Client) CreateMessagesWithFile(ctx context.Context, workspaceID, sessionID string, req MessageUpload) (result []*Message, err error) {
     requestURL, err := c.endpoint(workspaceBaseURI, workspaceID, "sessions", sessionID, "messages", "upload")
     if err != nil {
         return
@@ -536,10 +537,10 @@ requestURL := c.baseURL.JoinPath(workspaceBaseURI, workspaceID)  // WRONG!
 
 | Method | Use Case | Example |
 |--------|----------|---------|
-| `GET` | Retrieve resources | GetPeer, GetSession |
-| `POST` | Create resources or complex queries | GetOrCreateWorkspace, CreateMessages |
+| `GET` | Retrieve resources | GetMessage, GetConclusion |
+| `POST` | Create resources or complex queries | GetOrCreateWorkspace, CreateMessagesForSession |
 | `PUT` | Full resource updates | UpdateWorkspace |
-| `DELETE` | Remove resources | DeleteWorkspace, DeletePeer |
+| `DELETE` | Remove resources | DeleteWorkspace, DeleteSession |
 
 ```go
 // ✅ Use appropriate HTTP method
@@ -561,8 +562,8 @@ http.MethodGet    // for operations with request body (use POST)
 
 ```go
 // ✅ Build query parameters using url.Values
-func (c *Client) GetSessions(workspaceID string, opts *GetSessionsOptions) (result *PageSession, err error) {
-    requestURL, err := c.endpoint(workspaceBaseURI, workspaceID, "sessions")
+func (c *Client) GetSessionPeers(ctx context.Context, workspaceID, sessionID string, opts *GetSessionPeersOptions) (result *PagePeer, err error) {
+    requestURL, err := c.endpoint(workspaceBaseURI, workspaceID, "sessions", sessionID, "peers")
     if err != nil {
         return
     }
@@ -576,16 +577,16 @@ func (c *Client) GetSessions(workspaceID string, opts *GetSessionsOptions) (resu
         if opts.Size > 0 {
             query.Set("size", strconv.Itoa(opts.Size))
         }
-        // ✅ For bool fields with omitempty: check value directly
-        if opts.Reverse {
-            query.Set("reverse", "true")
+        // Cursor through the shared helper (see Pagination)
+        if err = setCursor(query, opts.Page, opts.Cursor); err != nil {
+            return
         }
         requestURL.RawQuery = query.Encode()
     }
     
-    result = new(PageSession)
-    if _, err = c.request(http.MethodGet, requestURL, nil, nil, &result); err != nil {
-        err = fmt.Errorf("failed to get sessions: %w", err)
+    result = new(PagePeer)
+    if _, err = c.request(ctx, http.MethodGet, requestURL, nil, nil, &result); err != nil {
+        err = fmt.Errorf("failed to execute request: %w", err)
         return
     }
     return
@@ -596,12 +597,8 @@ func (c *Client) GetSessions(workspaceID string, opts *GetSessionsOptions) (resu
 
 ```go
 // ✅ Combine query parameters with request body
-func (c *Client) SearchMessages(workspaceID string, req WorkspaceMessageSearchOptions, opts *SearchOptions) (result *MessageSearchResult, err error) {
-    if err = req.Validate(); err != nil {
-        return
-    }
-    
-    requestURL, err := c.endpoint(workspaceBaseURI, workspaceID, "messages", "search")
+func (c *Client) GetSessions(ctx context.Context, workspaceID string, req *WorkspaceSessionGet, opts *GetSessionsOptions) (result *PageSession, err error) {
+    requestURL, err := c.endpoint(workspaceBaseURI, workspaceID, "sessions", "list")
     if err != nil {
         return
     }
@@ -609,15 +606,28 @@ func (c *Client) SearchMessages(workspaceID string, req WorkspaceMessageSearchOp
     // Add query parameters (if any)
     if opts != nil {
         query := requestURL.Query()
-        if opts.Limit > 0 {
-            query.Set("limit", strconv.Itoa(opts.Limit))
+        if opts.Page > 0 {
+            query.Set("page", strconv.Itoa(opts.Page))
+        }
+        if opts.Size > 0 {
+            query.Set("size", strconv.Itoa(opts.Size))
+        }
+        if err = setCursor(query, opts.Page, opts.Cursor); err != nil {
+            return
+        }
+        // ✅ For bool fields with omitempty: check value directly
+        if opts.Reverse {
+            query.Set("reverse", "true")
+        }
+        if opts.IncludeScopes {
+            query.Set("include_scopes", "true")
         }
         requestURL.RawQuery = query.Encode()
     }
     
-    result = new(MessageSearchResult)
-    if _, err = c.request(http.MethodPost, requestURL, nil, req, &result); err != nil {
-        err = fmt.Errorf("failed to search messages: %w", err)
+    result = new(PageSession)
+    if _, err = c.request(ctx, http.MethodPost, requestURL, nil, req, &result); err != nil {
+        err = fmt.Errorf("failed to execute request: %w", err)
         return
     }
     return
@@ -638,26 +648,26 @@ func (c *Client) SearchMessages(workspaceID string, req WorkspaceMessageSearchOp
 ```go
 // ✅ Standard JSON response - result is populated automatically
 result = new(Peer)
-if _, err = c.request(http.MethodGet, requestURL, nil, nil, &result); err != nil {
+if _, err = c.request(ctx, http.MethodGet, requestURL, nil, nil, &result); err != nil {
     return
 }
 // result is now populated with JSON-decoded data
 
 // ✅ Array response - use slice pointer
 result = make([]*Message, 0)
-if _, err = c.request(http.MethodPost, requestURL, nil, req, &result); err != nil {
+if _, err = c.request(ctx, http.MethodPost, requestURL, nil, req, &result); err != nil {
     return
 }
 
 // ✅ No response body (204 No Content, 202 Accepted)
-if _, err = c.request(http.MethodDelete, requestURL, nil, nil, nil); err != nil {
+if _, err = c.request(ctx, http.MethodDelete, requestURL, nil, nil, nil); err != nil {
     return
 }
 // No result to decode
 
-// ✅ Raw response body (e.g., for file downloads)
+// ✅ Raw response body (e.g., for file downloads): pass the *bytes.Buffer itself
 result = new(bytes.Buffer)
-if _, err = c.request(http.MethodGet, requestURL, nil, nil, &result); err != nil {
+if _, err = c.request(ctx, http.MethodGet, requestURL, nil, nil, result); err != nil {
     return
 }
 // result contains raw bytes
@@ -693,9 +703,9 @@ type PageSession struct {
 // ✅ Pagination in options struct
 type GetSessionsOptions struct {
     // Page is the page number (default: 1, minimum: 1)
-    Page int `json:"page,omitempty"`
+    Page int
     // Size is the page size (default: 50, minimum: 1, maximum: 100)
-    Size int `json:"size,omitempty"`
+    Size int
     // Cursor opts in to cursor pagination when not nil (default: nil, for page numbers)
     Cursor *string `json:"cursor,omitempty"`  // nil = page numbers, "" = first cursor page
     // Reverse is whether to reverse the order of results (default: false)
@@ -742,10 +752,10 @@ for opts.Cursor != nil {
 
 ```go
 // ✅ Use named returns
-func (c *Client) GetOrCreateWorkspace(req CreateWorkspaceRequest) (result *Workspace, err error)
+func (c *Client) GetOrCreateWorkspace(ctx context.Context, req CreateWorkspaceRequest) (result *Workspace, err error)
 
 // ❌ Avoid anonymous returns
-func (c *Client) GetOrCreateWorkspace(req CreateWorkspaceRequest) (*Workspace, error)
+func (c *Client) GetOrCreateWorkspace(ctx context.Context, req CreateWorkspaceRequest) (*Workspace, error)
 ```
 
 ### Return Statements
@@ -871,7 +881,7 @@ if valErr, ok := err.(*HTTPValidationError); ok {  // breaks with wrapped errors
 
 ```go
 // ✅ Use 'any' instead of 'interface{}'
-Metadata map[string]any `json:"metadata,omitempty"`
+Filters map[string]any `json:"filters,omitempty"`
 
 // ✅ Use pointers for optional nested structs that can be omitempty
 Configuration *WorkspaceConfiguration `json:"configuration,omitempty"`
@@ -886,14 +896,15 @@ Configuration WorkspaceConfiguration `json:"configuration,omitempty"`
 
 ```go
 // ✅ Use concrete types for API requests and responses
-func (c *Client) GetPeer(workspaceID, peerID string) (result *Peer, err error)
+func (c *Client) GetConclusion(ctx context.Context, workspaceID, conclusionID string) (result *Conclusion, err error)
 
-// ❌ Avoid generics for API types - reduces IDE autocomplete and clarity
-func (c *Client) GetResource[T any](workspaceID, resourceType, resourceID string) (result *T, err error)
+// ❌ Avoid generics for API types - reduces IDE autocomplete and clarity (methods cannot have
+// type parameters anyway, so this would have to be a function taking the client)
+func GetResource[T any](ctx context.Context, c *Client, workspaceID, resourceType, resourceID string) (result *T, err error)
 ```
 
 **When to use `any`:**
-- ✅ Map values: `map[string]any` for flexible metadata
+- ✅ Map values: `map[string]any` for filters
 - ✅ Slice elements: `[]any` for heterogeneous lists
 - ❌ NOT for request/response types - use concrete structs
 
@@ -902,8 +913,8 @@ func (c *Client) GetResource[T any](workspaceID, resourceType, resourceID string
 ```go
 // ✅ Pointer to distinguish nil vs zero value
 type GetPeerContextOptions struct {
-    SearchTopK *int     `json:"search_top_k,omitempty"`  // nil = not provided, 0 = explicitly zero
-    Filters    *string  `json:"filters,omitempty"`       // nil = not provided, "" = empty string
+    SearchTopK *int     // nil = not provided, 0 = explicitly zero
+    Target     *string  // nil = not provided, "" = empty string
 }
 
 // ✅ Value type when 0 means "use server default"
@@ -922,10 +933,10 @@ TopK *int `json:"top_k,omitempty"`  // forces caller to use &value
 result = make([]*Message, 0, len(req.Messages))
 
 // ✅ Initialize empty slices for JSON responses
-result = new(PageSession)  // PageSession.Sessions will be []Session or nil
+result = new(PageSession)  // PageSession.Items will be []Session or nil
 
 // ❌ Don't leave slices as nil if they should be empty arrays in JSON
-result = &PageSession{Sessions: nil}  // encodes as null, not []
+result = &PageSession{Items: nil}  // encodes as null, not []
 ```
 
 ### Time.Time Handling
@@ -940,8 +951,8 @@ type Workspace struct {
 }
 
 // ✅ time.Time pointers for optional timestamps
-type Session struct {
-    EndedAt *time.Time `json:"ended_at,omitempty"`  // nil = not ended
+type DreamRun struct {
+    FinishedAt *time.Time `json:"finished_at,omitempty"`  // nil = not finished
 }
 ```
 
@@ -958,16 +969,17 @@ type Session struct {
 
 ```go
 // ✅ Use snake_case for JSON tags (API convention)
-type CreateWorkspaceRequest struct {
-    WorkspaceID   string         `json:"workspace_id"`
-    CreatedAt     time.Time      `json:"created_at"`
-    Metadata      map[string]any `json:"metadata,omitempty"`
-    Configuration *WorkspaceConfig `json:"configuration,omitempty"`
+type MessageCreate struct {
+    Content       string                `json:"content"`
+    PeerID        string                `json:"peer_id"`
+    Metadata      json.RawMessage       `json:"metadata,omitempty"`
+    Configuration *MessageConfiguration `json:"configuration,omitempty"`
+    CreatedAt     *time.Time            `json:"created_at,omitempty"`
 }
 
 // ✅ Use omitempty for optional fields
 type UpdateRequest struct {
-    Metadata map[string]any `json:"metadata,omitempty"`  // optional
+    Metadata json.RawMessage `json:"metadata,omitempty"`  // optional
 }
 
 // ✅ Required fields omit omitempty
@@ -1065,7 +1077,7 @@ func (req ConclusionQuery) Validate() error {
 
 // ❌ Don't add Validate() if ALL fields are optional - omit the method entirely
 type MessageUpdate struct {
-    Metadata map[string]any `json:"metadata,omitempty"`  // only field, and it's optional
+    Metadata json.RawMessage `json:"metadata,omitempty"`  // only field, and it's optional
 }
 // No Validate() method needed - caller can pass empty struct{}
 ```
@@ -1079,7 +1091,7 @@ type MessageUpdate struct {
 
 ```go
 // ✅ Call Validate() at the start of methods (ONLY if Validate() method exists)
-func (c *Client) GetOrCreateWorkspace(req CreateWorkspaceRequest) (result *Workspace, err error) {
+func (c *Client) GetOrCreateWorkspace(ctx context.Context, req CreateWorkspaceRequest) (result *Workspace, err error) {
     if err = req.Validate(); err != nil {
         return
     }
@@ -1087,7 +1099,7 @@ func (c *Client) GetOrCreateWorkspace(req CreateWorkspaceRequest) (result *Works
 }
 
 // ✅ When ALL fields are optional, do NOT call Validate() (method doesn't exist)
-func (c *Client) CreateKey(req CreateKeyRequest) (result *Key, err error) {
+func (c *Client) CreateKey(ctx context.Context, req CreateKeyRequest) (result *Key, err error) {
     // No validation call - all fields are optional, Validate() method doesn't exist
     requestURL, err := c.endpoint(keyBaseURI)
     if err != nil {
@@ -1097,7 +1109,7 @@ func (c *Client) CreateKey(req CreateKeyRequest) (result *Key, err error) {
 }
 
 // ❌ Don't call Validate() when the method doesn't exist
-func (c *Client) CreateKey(req CreateKeyRequest) (result *Key, err error) {
+func (c *Client) CreateKey(ctx context.Context, req CreateKeyRequest) (result *Key, err error) {
     if err = req.Validate(); err != nil {  // ERROR: Validate() method doesn't exist!
         return
     }
@@ -1287,7 +1299,7 @@ type SessionPeerConfig struct {
 // ✅ Use *bool for optional fields where 0/empty string distinction matters
 type GetPeerContextOptions struct {
     // SearchTopK: nil = not provided, 0 = explicitly zero
-    SearchTopK *int `json:"search_top_k,omitempty"`  // omitempty omits only nil, 0 is still sent
+    SearchTopK *int  // a query parameter: only nil is left out, 0 is still sent
 }
 
 // ❌ WRONG: *bool for simple flags is overkill
@@ -1347,10 +1359,11 @@ To change one field of a workspace or session configuration section, send the wh
 ### Method Signature
 
 ```go
-func (c *Client) request(method string, requestURL *url.URL, headers http.Header, body, result any) (responseHeaders http.Header, err error)
+func (c *Client) request(ctx context.Context, method string, requestURL *url.URL, headers http.Header, body, result any) (responseHeaders http.Header, err error)
 ```
 
 **Parameters:**
+- `ctx`: Context of the request, given to `http.NewRequestWithContext`: cancelling it aborts the request
 - `method`: HTTP method (GET, POST, PUT, DELETE, etc.)
 - `requestURL`: Full URL constructed with `c.endpoint()`
 - `headers`: Optional HTTP headers (nil for most cases)
@@ -1396,7 +1409,7 @@ body := &bytes.Buffer{}  // *bytes.Buffer implements io.Reader
 
 ```go
 // ✅ Complete multipart form pattern
-func (c *Client) CreateMessagesWithFile(workspaceID, sessionID string, req MessageUpload) (result []*Message, err error) {
+func (c *Client) CreateMessagesWithFile(ctx context.Context, workspaceID, sessionID string, req MessageUpload) (result []*Message, err error) {
     // Validate request
     if err = req.Validate(); err != nil {
         return
@@ -1435,7 +1448,7 @@ func (c *Client) CreateMessagesWithFile(workspaceID, sessionID string, req Messa
     // Make request - pass bytes.Buffer (implements io.Reader)
     // request() detects io.Reader and uses it directly without modification
     // Content-Type header with boundary is preserved
-    if _, err = c.request(http.MethodPost, requestURL, headers, bodyBuffer, &result); err != nil {
+    if _, err = c.request(ctx, http.MethodPost, requestURL, headers, bodyBuffer, &result); err != nil {
         err = fmt.Errorf("failed to upload file: %w", err)
         return
     }
@@ -1443,7 +1456,7 @@ func (c *Client) CreateMessagesWithFile(workspaceID, sessionID string, req Messa
 }
 
 // ❌ Don't convert multipart buffer to string - loses binary data integrity
-if _, err = c.request(http.MethodPost, requestURL, headers, bodyBuffer.String(), &result); err != nil {
+if _, err = c.request(ctx, http.MethodPost, requestURL, headers, bodyBuffer.String(), &result); err != nil {
 
 // ❌ Don't forget to close the multipart writer before making request
 // ❌ Don't forget to set Content-Type header with writer.FormDataContentType()
@@ -1558,32 +1571,31 @@ func TestCreateWorkspaceRequest_Validate(t *testing.T) {
 **Complete method implementation example:**
 
 ```go
-// GetPeer gets a Peer by ID.
+// GetConclusion gets a single Conclusion by ID.
 //
-// Retrieves a specific peer from the workspace by its unique identifier.
-// Returns the peer's current state including metadata and configuration.
+// Honcho answers 404 for an unknown ID, an unknown workspace or a deleted conclusion.
 //
-// https://docs.honcho.dev/v3/api-reference/endpoint/peers/get-peer
-func (c *Client) GetPeer(workspaceID, peerID string) (result *Peer, err error) {
+// https://docs.honcho.dev/v3/api-reference/endpoint/conclusions/get-conclusion
+func (c *Client) GetConclusion(ctx context.Context, workspaceID, conclusionID string) (result *Conclusion, err error) {
     // Validate path parameters
     if workspaceID == "" {
         err = errors.New("workspaceID is required")
         return
     }
-    if peerID == "" {
-        err = errors.New("peerID is required")
+    if conclusionID == "" {
+        err = errors.New("conclusionID is required")
         return
     }
     // Construct URL
-    requestURL, err := c.endpoint(workspaceBaseURI, workspaceID, "peers", peerID)
+    requestURL, err := c.endpoint(workspaceBaseURI, workspaceID, "conclusions", conclusionID)
     if err != nil {
         return
     }
     // Initialize result
-    result = new(Peer)
+    result = new(Conclusion)
     // Make request
-    if _, err = c.request(http.MethodGet, requestURL, nil, nil, &result); err != nil {
-        err = fmt.Errorf("failed to get peer: %w", err)
+    if _, err = c.request(ctx, http.MethodGet, requestURL, nil, nil, &result); err != nil {
+        err = fmt.Errorf("failed to get conclusion: %w", err)
         return
     }
     return
