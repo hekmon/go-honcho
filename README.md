@@ -708,16 +708,16 @@ The SDK uses Go pointers strategically to distinguish between "not set" and "set
 
 ### Return Types
 
-Most API methods return a pointer to a struct, or a slice when they return several objects:
+Most API methods return a pointer to a struct, or a value slice `[]Type` when they return several objects:
 
 ```go
 // Single object returns *Type
 workspace, err := client.GetOrCreateWorkspace(ctx, req)  // *Workspace
 peer, err := client.GetOrCreatePeer(ctx, workspaceID, req)  // *Peer
 
-// Multiple object returns a slice ([]*Type or []Type)
+// Multiple objects are returned as a value slice []Type
 messages, err := client.SearchWorkspace(ctx, workspaceID, req)  // []Message
-conclusions, err := client.QueryConclusions(ctx, workspaceID, req)  // []*Conclusion
+conclusions, err := client.QueryConclusions(ctx, workspaceID, req)  // []Conclusion
 
 // Paginated returns *PageType
 sessions, err := client.GetSessions(ctx, workspaceID, req, opts)  // *PageSession

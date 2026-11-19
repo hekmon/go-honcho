@@ -322,7 +322,7 @@ import (
 // They form the basis of a Peer's Representation.
 //
 // https://docs.honcho.dev/v3/api-reference/endpoint/conclusions/create-conclusions
-func (c *Client) CreateConclusions(ctx context.Context, workspaceID string, req ConclusionBatchCreate) (result []*Conclusion, err error) {
+func (c *Client) CreateConclusions(ctx context.Context, workspaceID string, req ConclusionBatchCreate) (result []Conclusion, err error) {
 ```
 
 **Block Comment Guidelines:**
@@ -446,7 +446,7 @@ Before finalizing a method, verify:
 - [ ] Uses `c.request()` method
 - [ ] Errors wrapped with `%w`
 - [ ] Naked returns (no explicit return values)
-- [ ] Result initialized correctly (`new(Type)` or `make([]*Type, 0, capacity)`)
+- [ ] Result initialized correctly: `new(Type)` for a single object; a list is a value slice `[]Type`, left nil, its address passed to `c.request`, and set back to nil when `c.request` fails
 
 ### Standard Method Structure
 
@@ -514,7 +514,7 @@ func (c *Client) DeleteWorkspace(ctx context.Context, workspaceID string) (err e
 }
 
 // ✅ Multiple path parameters
-func (c *Client) CreateMessagesWithFile(ctx context.Context, workspaceID, sessionID string, req MessageUpload) (result []*Message, err error) {
+func (c *Client) CreateMessagesWithFile(ctx context.Context, workspaceID, sessionID string, req MessageUpload) (result []Message, err error) {
     requestURL, err := c.endpoint(workspaceBaseURI, workspaceID, "sessions", sessionID, "messages", "upload")
     if err != nil {
         return
@@ -653,11 +653,12 @@ if _, err = c.request(ctx, http.MethodGet, requestURL, nil, nil, &result); err !
 }
 // result is now populated with JSON-decoded data
 
-// ✅ Array response - the result is a slice, not a pointer to one: pass its address
-result = make([]*Message, 0)
+// ✅ Array response - the result is a value slice ([]Message), left nil: pass its address
 if _, err = c.request(ctx, http.MethodPost, requestURL, nil, req, &result); err != nil {
+    result = nil // a failed decode can leave items in it
     return
 }
+// result is a non-nil slice, empty for [], and stays nil on error
 
 // ✅ No response body (204 No Content, 202 Accepted)
 if _, err = c.request(ctx, http.MethodDelete, requestURL, nil, nil, nil); err != nil {
@@ -675,7 +676,7 @@ if _, err = c.request(ctx, http.MethodGet, requestURL, nil, nil, result); err !=
 
 **Response Type Guidelines:**
 - ✅ Use `new(Type)` for single object responses
-- ✅ Use `make([]*Type, 0, capacity)` for array responses (ensures JSON encodes as `[]` not `null`): lists are returned as slices, not pointers to slices
+- ✅ Return an array response as a value slice `[]Type`, never `[]*Type` or `*[]Type`: declare it nil and pass its address to `c.request`. A JSON array decodes to a non-nil slice, empty for `[]`, and the result stays nil on error
 - ✅ Use `nil` for no response body (DELETE, some POST operations)
 - ✅ Use `*bytes.Buffer` for raw binary responses
 - ❌ Don't manually decode JSON responses (request() handles this)
@@ -929,14 +930,22 @@ TopK *int `json:"top_k,omitempty"`  // forces caller to use &value
 **Slice initialization:**
 
 ```go
-// ✅ Initialize slices that will be populated
-result = make([]*Message, 0, len(req.Messages))
+// ✅ Leave a list result nil and pass its address to c.request (result []Message):
+// a JSON array decodes to a non-nil slice, empty for [], and the result stays nil on error
+if _, err = c.request(ctx, http.MethodPost, requestURL, nil, req, &result); err != nil {
+    result = nil // a failed decode can leave items in it
+    return
+}
 
-// ✅ Initialize empty slices for JSON responses
-result = new(PageSession)  // PageSession.Items will be []Session or nil
+// ✅ A page is a single object, its items a value slice decoded the same way
+result = new(PageSession)  // PageSession.Items is a []Session
 
-// ❌ Don't leave slices as nil if they should be empty arrays in JSON
-result = &PageSession{Items: nil}  // encodes as null, not []
+// ❌ Don't make a list result: decoding allocates the slice it needs
+result = make([]Message, 0, len(req.Messages))
+
+// ❌ Don't hold pointers in a list, nor return a pointer to a list
+func (c *Client) CreateMessagesForSession(...) (result []*Message, err error)
+func (c *Client) SearchPeer(...) (result *[]Message, err error)
 ```
 
 ### Time.Time Handling
@@ -1409,7 +1418,7 @@ body := &bytes.Buffer{}  // *bytes.Buffer implements io.Reader
 
 ```go
 // ✅ Complete multipart form pattern
-func (c *Client) CreateMessagesWithFile(ctx context.Context, workspaceID, sessionID string, req MessageUpload) (result []*Message, err error) {
+func (c *Client) CreateMessagesWithFile(ctx context.Context, workspaceID, sessionID string, req MessageUpload) (result []Message, err error) {
     // Validate request
     if err = req.Validate(); err != nil {
         return
@@ -1476,13 +1485,12 @@ func (c *Client) CreateMessagesWithFile(ctx context.Context, workspaceID, sessio
         err = fmt.Errorf("failed to close multipart writer: %w", err)
         return
     }
-    // Initialize result
-    result = make([]*Message, 0)
     // Build headers with Content-Type
     headers := make(http.Header)
     headers.Set("Content-Type", writer.FormDataContentType())
     // Make request with bytes.Buffer body (multipart data)
     if _, err = c.request(ctx, http.MethodPost, requestURL, headers, bodyBuffer, &result); err != nil {
+        result = nil // a failed decode can leave items in it
         err = fmt.Errorf("failed to upload file and create messages: %w", err)
         return
     }

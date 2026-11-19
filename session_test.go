@@ -1,6 +1,7 @@
 package honcho
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -355,9 +356,83 @@ func TestGetOrCreateSessionScopesLimit(t *testing.T) {
 	})
 }
 
+// SearchSession sends the query in a POST request to the session's search path, decodes the
+// messages of the response into a slice of values, and returns no messages with an error, even when
+// a message fails to decode after others did. Regression test: it returned the messages decoded
+// before the failing one with the error.
+func TestSearchSessionResponse(t *testing.T) {
+	checkSearchResponses(t, "/v3/workspaces/workspace/sessions/session/search", func(ctx context.Context, client *Client) ([]Message, error) {
+		return client.SearchSession(ctx, "workspace", "session", MessageSearchOptions{Query: searchQuery})
+	})
+}
+
+// createdMessagesJSON is a list of two messages in the shape of upstream's Message schema, as the
+// route creating messages in a session answers it.
+const createdMessagesJSON = `[` +
+	`{"id":"m1","content":"Hello.","peer_id":"alice","session_id":"session","metadata":{},"created_at":"2026-11-19T10:00:00.123456Z","workspace_id":"workspace","token_count":2},` +
+	`{"id":"m2","content":"Hi alice.","peer_id":"bob","session_id":"session","metadata":{"mood":"happy"},"created_at":"2026-11-19T10:00:01Z","workspace_id":"workspace","token_count":3}` +
+	`]`
+
+// createdMessages returns what createdMessagesJSON decodes to.
+func createdMessages() []Message {
+	return []Message{
+		{
+			ID:          "m1",
+			Content:     "Hello.",
+			PeerID:      "alice",
+			SessionID:   "session",
+			Metadata:    json.RawMessage(`{}`),
+			CreatedAt:   time.Date(2026, time.November, 19, 10, 0, 0, 123456000, time.UTC),
+			WorkspaceID: "workspace",
+			TokenCount:  2,
+		},
+		{
+			ID:          "m2",
+			Content:     "Hi alice.",
+			PeerID:      "bob",
+			SessionID:   "session",
+			Metadata:    json.RawMessage(`{"mood":"happy"}`),
+			CreatedAt:   time.Date(2026, time.November, 19, 10, 0, 1, 0, time.UTC),
+			WorkspaceID: "workspace",
+			TokenCount:  3,
+		},
+	}
+}
+
+// CreateMessagesForSession sends the messages in a POST request to the session's messages path,
+// decodes the messages of the response into a slice of values, a response holding no message into
+// an empty slice, and returns no messages with an error, even when a message fails to decode after
+// others did. Regression test: it returned a slice of pointers to the messages, and with an error,
+// an empty slice or the messages decoded before the failing one.
+func TestCreateMessagesForSessionResponse(t *testing.T) {
+	req := MessageBatchCreate{Messages: []MessageCreate{
+		{Content: "Hello.", PeerID: "alice"},
+		{Content: "Hi alice.", PeerID: "bob", Metadata: json.RawMessage(`{"mood":"happy"}`)},
+	}}
+	body := `{"messages":[{"content":"Hello.","peer_id":"alice"},{"content":"Hi alice.","peer_id":"bob","metadata":{"mood":"happy"}}]}`
+	checkArrayResponses(t, "/v3/workspaces/workspace/sessions/session/messages", body, http.StatusCreated, createdMessagesJSON, createdMessages(),
+		func(ctx context.Context, client *Client) ([]Message, error) {
+			return client.CreateMessagesForSession(ctx, "workspace", "session", req)
+		})
+}
+
 // uploadedMessagesJSON is a list of one message in the shape of upstream's Message schema, as the
 // upload route answers it.
 const uploadedMessagesJSON = `[{"id":"m1","content":"line one\nline two","peer_id":"alice","session_id":"session","metadata":{},"created_at":"2026-11-19T10:00:00Z","workspace_id":"workspace","token_count":4}]`
+
+// uploadedMessages returns what uploadedMessagesJSON decodes to.
+func uploadedMessages() []Message {
+	return []Message{{
+		ID:          "m1",
+		Content:     "line one\nline two",
+		PeerID:      "alice",
+		SessionID:   "session",
+		Metadata:    json.RawMessage(`{}`),
+		CreatedAt:   time.Date(2026, time.November, 19, 10, 0, 0, 0, time.UTC),
+		WorkspaceID: "workspace",
+		TokenCount:  4,
+	}}
+}
 
 // receivedUpload is what a test server recorded of a multipart upload it received.
 type receivedUpload struct {
@@ -534,6 +609,34 @@ func TestCreateMessagesWithFileForm(t *testing.T) {
 			}
 		})
 	}
+}
+
+// CreateMessagesWithFile decodes the messages of the response into a slice of values, and returns
+// no messages with an error, even when a message fails to decode after others did. Regression test:
+// it returned a slice of pointers to the messages, and with an error, the messages decoded before
+// the failing one.
+func TestCreateMessagesWithFileResponse(t *testing.T) {
+	upload := MessageUpload{File: []byte("line one\nline two"), Filename: "notes.txt", PeerID: "alice"}
+	t.Run("items", func(t *testing.T) {
+		client, _ := uploadServer(t)
+
+		messages, err := client.CreateMessagesWithFile(t.Context(), "workspace", "session", upload)
+		if err != nil {
+			t.Fatalf("CreateMessagesWithFile: %v", err)
+		}
+
+		checkItems(t, messages, uploadedMessages())
+	})
+	t.Run("item failing to decode", func(t *testing.T) {
+		client, _ := scopeServer(t, http.StatusCreated, undecodableItemsJSON)
+
+		messages, err := client.CreateMessagesWithFile(t.Context(), "workspace", "session", upload)
+		if err == nil {
+			t.Error("error = nil, want an error")
+		}
+
+		checkItems(t, messages, nil)
+	})
 }
 
 // checkUploadValidation reports an error unless MessageUpload.Validate and CreateMessagesWithFile

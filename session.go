@@ -436,6 +436,7 @@ func (c *Client) SearchSession(ctx context.Context, workspaceID, sessionID strin
 		ctx, http.MethodPost, requestURL, nil,
 		req, &result,
 	); err != nil {
+		result = nil // a failed decode can leave items in it
 		err = fmt.Errorf("failed to execute request: %w", err)
 		return
 	}

@@ -34,7 +34,7 @@ func (req WebhookEndpointCreate) Validate() error {
 // PageWebhookEndpoint represents a paginated list of webhook endpoints.
 type PageWebhookEndpoint struct {
 	// Items is the list of webhook endpoints on this page.
-	Items []*WebhookEndpoint `json:"items"`
+	Items []WebhookEndpoint `json:"items"`
 	// Total is the total number of webhook endpoints. It is zero on a cursor page.
 	Total int `json:"total"`
 	// Page is the current page number (minimum: 1). It is zero on a cursor page.

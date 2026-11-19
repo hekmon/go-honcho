@@ -729,27 +729,41 @@ func searchedMessages() []Message {
 }
 
 // checkSearchResponses runs search, which must send searchQuery alone in a POST request to path,
-// against a server giving each response below, and reports an error unless the messages are
-// decoded into a slice of values, in the order the server sent them, a response holding no message
-// into an empty slice, and an error status into its error and no messages.
+// through checkArrayResponses, the server answering 200 with searchedMessagesJSON for the messages.
 func checkSearchResponses(t *testing.T, path string, search func(ctx context.Context, client *Client) ([]Message, error)) {
+	t.Helper()
+	checkArrayResponses(t, path, `{"query":"`+searchQuery+`"}`, http.StatusOK, searchedMessagesJSON, searchedMessages(), search)
+}
+
+// undecodableItemsJSON is a list of two items whose second fails to decode, after the first did:
+// its created_at is not a time. It fails for any type of item holding a created_at time, as every
+// list of the API does.
+const undecodableItemsJSON = `[{"id":"first","created_at":"2026-11-19T10:00:00Z"},{"id":"second","created_at":"not a time"}]`
+
+// checkArrayResponses runs call, which must send body in a POST request to path, against a server
+// giving each response below, and reports an error unless items, answered with status, decode into
+// want, a slice of values in the order the server sent them; a response holding no item into an
+// empty slice; and an error status, or an item failing to decode after another did, into an error
+// and a nil slice.
+func checkArrayResponses[T any](t *testing.T, path, body string, status int, items string, want []T, call func(ctx context.Context, client *Client) ([]T, error)) {
 	t.Helper()
 	tests := []struct {
 		name     string
 		status   int
 		response string
-		want     []Message
+		want     []T
 		wantErr  bool
 	}{
-		{name: "messages", status: http.StatusOK, response: searchedMessagesJSON, want: searchedMessages()},
-		{name: "no message", status: http.StatusOK, response: `[]`, want: []Message{}},
+		{name: "items", status: status, response: items, want: want},
+		{name: "no item", status: status, response: `[]`, want: []T{}},
 		{name: "error status", status: http.StatusNotFound, response: `{"detail":"Workspace workspace not found"}`, wantErr: true},
+		{name: "item failing to decode", status: status, response: undecodableItemsJSON, wantErr: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			client, received := scopeServer(t, tt.status, tt.response)
 
-			messages, err := search(t.Context(), client)
+			result, err := call(t.Context(), client)
 
 			if tt.wantErr && err == nil {
 				t.Error("error = nil, want an error")
@@ -757,13 +771,20 @@ func checkSearchResponses(t *testing.T, path string, search func(ctx context.Con
 			if !tt.wantErr && err != nil {
 				t.Errorf("error = %v, want nil", err)
 			}
-			if !reflect.DeepEqual(messages, tt.want) {
-				got, _ := json.Marshal(messages)
-				want, _ := json.Marshal(tt.want)
-				t.Errorf("messages = %s, want %s", got, want)
-			}
-			checkScopeRequest(t, received(), http.MethodPost, path, url.Values{}, `{"query":"`+searchQuery+`"}`)
+			checkItems(t, result, tt.want)
+			checkScopeRequest(t, received(), http.MethodPost, path, url.Values{}, body)
 		})
+	}
+}
+
+// checkItems reports an error unless got holds the items of want, in the same order, and is nil
+// exactly when want is: DeepEqual tells a nil slice from an empty one.
+func checkItems[T any](t *testing.T, got, want []T) {
+	t.Helper()
+	if !reflect.DeepEqual(got, want) {
+		gotJSON, _ := json.Marshal(got)
+		wantJSON, _ := json.Marshal(want)
+		t.Errorf("result = %s, want %s", gotJSON, wantJSON)
 	}
 }
 

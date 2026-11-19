@@ -15,7 +15,7 @@ import (
 // They form the basis of a Peer's Representation.
 //
 // https://docs.honcho.dev/v3/api-reference/endpoint/conclusions/create-conclusions
-func (c *Client) CreateConclusions(ctx context.Context, workspaceID string, req ConclusionBatchCreate) (result []*Conclusion, err error) {
+func (c *Client) CreateConclusions(ctx context.Context, workspaceID string, req ConclusionBatchCreate) (result []Conclusion, err error) {
 	if workspaceID == "" {
 		err = errors.New("workspaceID is required")
 		return
@@ -27,8 +27,8 @@ func (c *Client) CreateConclusions(ctx context.Context, workspaceID string, req 
 	if err != nil {
 		return
 	}
-	result = make([]*Conclusion, 0, len(req.Conclusions))
 	if _, err = c.request(ctx, http.MethodPost, requestURL, nil, req, &result); err != nil {
+		result = nil // a failed decode can leave items in it
 		err = fmt.Errorf("failed to create conclusions: %w", err)
 		return
 	}
@@ -132,7 +132,7 @@ func (c *Client) ListConclusions(ctx context.Context, workspaceID string, req *C
 // and the observed peer, under `observed` or `observed_id`.
 //
 // https://docs.honcho.dev/v3/api-reference/endpoint/conclusions/query-conclusions
-func (c *Client) QueryConclusions(ctx context.Context, workspaceID string, req ConclusionQuery) (result []*Conclusion, err error) {
+func (c *Client) QueryConclusions(ctx context.Context, workspaceID string, req ConclusionQuery) (result []Conclusion, err error) {
 	if workspaceID == "" {
 		err = errors.New("workspaceID is required")
 		return
@@ -144,8 +144,8 @@ func (c *Client) QueryConclusions(ctx context.Context, workspaceID string, req C
 	if err != nil {
 		return
 	}
-	result = make([]*Conclusion, 0, req.TopK)
 	if _, err = c.request(ctx, http.MethodPost, requestURL, nil, req, &result); err != nil {
+		result = nil // a failed decode can leave items in it
 		err = fmt.Errorf("failed to query conclusions: %w", err)
 		return
 	}

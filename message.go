@@ -13,7 +13,7 @@ import (
 )
 
 // https://docs.honcho.dev/v3/api-reference/endpoint/messages/create-messages-for-session
-func (c *Client) CreateMessagesForSession(ctx context.Context, workspaceID, sessionID string, req MessageBatchCreate) (result []*Message, err error) {
+func (c *Client) CreateMessagesForSession(ctx context.Context, workspaceID, sessionID string, req MessageBatchCreate) (result []Message, err error) {
 	// Validate request
 	if err = req.Validate(); err != nil {
 		return
@@ -23,10 +23,9 @@ func (c *Client) CreateMessagesForSession(ctx context.Context, workspaceID, sess
 	if err != nil {
 		return
 	}
-	// Initialize result
-	result = make([]*Message, 0, len(req.Messages))
 	// Make request
 	if _, err = c.request(ctx, http.MethodPost, requestURL, nil, req, &result); err != nil {
+		result = nil // a failed decode can leave items in it
 		err = fmt.Errorf("failed to create messages: %w", err)
 		return
 	}
@@ -47,7 +46,7 @@ func (c *Client) CreateMessagesForSession(ctx context.Context, workspaceID, sess
 // 9999 before anything is sent.
 //
 // https://docs.honcho.dev/v3/api-reference/endpoint/messages/create-messages-with-file
-func (c *Client) CreateMessagesWithFile(ctx context.Context, workspaceID, sessionID string, req MessageUpload) (result []*Message, err error) {
+func (c *Client) CreateMessagesWithFile(ctx context.Context, workspaceID, sessionID string, req MessageUpload) (result []Message, err error) {
 	// Validate request
 	if err = req.Validate(); err != nil {
 		return
@@ -114,13 +113,12 @@ func (c *Client) CreateMessagesWithFile(ctx context.Context, workspaceID, sessio
 		err = fmt.Errorf("failed to close multipart writer: %w", err)
 		return
 	}
-	// Initialize result
-	result = make([]*Message, 0)
 	// Build headers with Content-Type
 	headers := make(http.Header)
 	headers.Set("Content-Type", writer.FormDataContentType())
 	// Make request with bytes.Buffer body (multipart data)
 	if _, err = c.request(ctx, http.MethodPost, requestURL, headers, bodyBuffer, &result); err != nil {
+		result = nil // a failed decode can leave items in it
 		err = fmt.Errorf("failed to upload file and create messages: %w", err)
 		return
 	}

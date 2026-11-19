@@ -348,6 +348,7 @@ func (c *Client) SearchPeer(ctx context.Context, workspaceID, peerID string, req
 		ctx, http.MethodPost, requestURL, nil,
 		req, &result,
 	); err != nil {
+		result = nil // a failed decode can leave items in it
 		err = fmt.Errorf("failed to execute request: %w", err)
 		return
 	}

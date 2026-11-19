@@ -1,6 +1,7 @@
 package honcho
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -152,4 +153,71 @@ func TestGetConclusionNotFound(t *testing.T) {
 	if !strings.Contains(err.Error(), "Conclusion not found") {
 		t.Errorf("error = %q, want it to hold %q", err, "Conclusion not found")
 	}
+}
+
+// storedConclusionsJSON is a list of two conclusions in the shape of upstream's Conclusion schema:
+// one stored in a session, the other in none.
+const storedConclusionsJSON = `[` +
+	`{"id":"c1","content":"bob has a sister named Joke.","observer_id":"alice","observed_id":"bob","session_id":"s","level":"explicit","source_ids":[],"source_message_ids":null,"times_derived":1,"created_at":"2026-11-19T10:00:00.123456Z"},` +
+	`{"id":"c2","content":"bob prefers email.","observer_id":"alice","observed_id":"bob","session_id":null,"level":"explicit","source_ids":[],"source_message_ids":null,"times_derived":1,"created_at":"2026-11-19T10:00:00.234567Z"}` +
+	`]`
+
+// storedConclusions returns what storedConclusionsJSON decodes to.
+func storedConclusions() []Conclusion {
+	return []Conclusion{
+		{
+			ID:           "c1",
+			Content:      "bob has a sister named Joke.",
+			ObserverID:   "alice",
+			ObservedID:   "bob",
+			SessionID:    pointerTo("s"),
+			Level:        ConclusionLevelExplicit,
+			SourceIDs:    []string{},
+			TimesDerived: 1,
+			CreatedAt:    time.Date(2026, time.November, 19, 10, 0, 0, 123456000, time.UTC),
+		},
+		{
+			ID:           "c2",
+			Content:      "bob prefers email.",
+			ObserverID:   "alice",
+			ObservedID:   "bob",
+			Level:        ConclusionLevelExplicit,
+			SourceIDs:    []string{},
+			TimesDerived: 1,
+			CreatedAt:    time.Date(2026, time.November, 19, 10, 0, 0, 234567000, time.UTC),
+		},
+	}
+}
+
+// CreateConclusions sends the conclusions in a POST request to the workspace's conclusions path,
+// decodes the conclusions of the response into a slice of values, a response holding no conclusion
+// into an empty slice, and returns no conclusions with an error, even when a conclusion fails to
+// decode after others did. Regression test: it returned a slice of pointers to the conclusions,
+// and with an error, an empty slice or the conclusions decoded before the failing one.
+func TestCreateConclusionsResponse(t *testing.T) {
+	req := ConclusionBatchCreate{Conclusions: []ConclusionCreate{
+		{Content: "bob has a sister named Joke.", ObserverID: "alice", ObservedID: "bob", SessionID: pointerTo("s")},
+		{Content: "bob prefers email.", ObserverID: "alice", ObservedID: "bob"},
+	}}
+	body := `{"conclusions":[` +
+		`{"content":"bob has a sister named Joke.","observer_id":"alice","observed_id":"bob","session_id":"s"},` +
+		`{"content":"bob prefers email.","observer_id":"alice","observed_id":"bob"}]}`
+	checkArrayResponses(t, "/v3/workspaces/workspace/conclusions", body, http.StatusCreated, storedConclusionsJSON, storedConclusions(),
+		func(ctx context.Context, client *Client) ([]Conclusion, error) {
+			return client.CreateConclusions(ctx, "workspace", req)
+		})
+}
+
+// QueryConclusions sends the query in a POST request to the workspace's conclusions query path,
+// decodes the conclusions of the response into a slice of values, a response holding no conclusion
+// into an empty slice, and returns no conclusions with an error, even when a conclusion fails to
+// decode after others did. Regression test: it returned a slice of pointers to the conclusions,
+// and with an error, an empty slice or the conclusions decoded before the failing one.
+func TestQueryConclusionsResponse(t *testing.T) {
+	req := ConclusionQuery{Query: "bob", TopK: 2, Filters: map[string]any{"observer_id": "alice", "observed_id": "bob"}}
+	body := `{"query":"bob","top_k":2,"filters":{"observer_id":"alice","observed_id":"bob"}}`
+	checkArrayResponses(t, "/v3/workspaces/workspace/conclusions/query", body, http.StatusOK, storedConclusionsJSON, storedConclusions(),
+		func(ctx context.Context, client *Client) ([]Conclusion, error) {
+			return client.QueryConclusions(ctx, "workspace", req)
+		})
 }

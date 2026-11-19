@@ -233,6 +233,7 @@ func (c *Client) SearchWorkspace(ctx context.Context, workspaceID string, req Wo
 		ctx, http.MethodPost, requestURL, nil,
 		req, &result,
 	); err != nil {
+		result = nil // a failed decode can leave items in it
 		err = fmt.Errorf("failed to execute request: %w", err)
 		return
 	}
