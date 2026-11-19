@@ -154,26 +154,6 @@ type QueueStatus struct {
 	Sessions            *map[string]SessionQueueStatus `json:"sessions,omitempty"`
 }
 
-// MessageSearchOptions represents the request body for searching the messages of a peer or a session.
-// SearchWorkspace takes WorkspaceMessageSearchOptions instead
-type MessageSearchOptions struct {
-	Query   string         `json:"query"`
-	Filters map[string]any `json:"filters,omitempty"`
-	// Limit is the maximum number of results to return (0=use default: 10, min: 1, max: 100)
-	Limit int `json:"limit,omitempty"`
-}
-
-// Validate checks that mandatory fields are valid
-func (req MessageSearchOptions) Validate() error {
-	if req.Query == "" {
-		return errors.New("query is required")
-	}
-	if req.Limit != 0 && (req.Limit < 1 || req.Limit > 100) {
-		return errors.New("limit must be between 1 and 100")
-	}
-	return nil
-}
-
 // WorkspaceMessageSearchOptions represents the request body for searching the messages of a workspace
 // with SearchWorkspace
 //
