@@ -25,11 +25,13 @@ type Peer struct {
 }
 
 // PeerConfig represents the workspace-level configuration for a peer
+//
+// Observing other peers is a session membership setting, SessionPeerConfig.ObserveOthers, set with
+// GetOrCreateSession, SetSessionPeers, AddPeersToSession or SetPeerConfig: Honcho has no peer-level
+// observe_others
 type PeerConfig struct {
 	// ObserveMe indicates whether Honcho will use reasoning to form a representation of this peer
 	ObserveMe *bool `json:"observe_me"`
-	// ObserveOthers indicates whether this peer should form a session-level theory-of-mind representation of other peers
-	ObserveOthers *bool `json:"observe_others"`
 }
 
 // PeerCreate represents the request body for creating/getting a peer
@@ -99,8 +101,10 @@ type PagePeer struct {
 
 // PeerUpdate represents the request body for updating a peer
 type PeerUpdate struct {
-	Metadata      json.RawMessage `json:"metadata,omitempty"`
-	Configuration PeerConfig      `json:"configuration,omitzero"`
+	Metadata json.RawMessage `json:"metadata,omitempty"`
+	// Configuration replaces the entire stored configuration. An empty non-nil value clears it.
+	// A nil value leaves it unchanged.
+	Configuration *PeerConfig `json:"configuration,omitempty"`
 }
 
 // PeerRepresentationGet represents the request body for getting a peer's representation

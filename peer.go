@@ -84,6 +84,9 @@ func (c *Client) GetAllPeers(ctx context.Context, workspaceID string, req *PeerG
 
 // UpdatePeer updates a Peer's metadata and/or configuration.
 //
+// A non-nil Configuration replaces the entire stored configuration, an empty one clearing it.
+// A nil Configuration leaves it unchanged.
+//
 // https://docs.honcho.dev/v3/api-reference/endpoint/peers/update-peer
 func (c *Client) UpdatePeer(ctx context.Context, workspaceID, peerID string, req PeerUpdate) (result *Peer, err error) {
 	if workspaceID == "" {

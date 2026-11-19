@@ -229,6 +229,11 @@ peer, err = client.UpdatePeer(ctx, "workspace-id", "user-123", honcho.PeerUpdate
     Metadata: json.RawMessage(`{"name": "Alice Smith"}`),
 })
 
+// Clear peer configuration (a nil Configuration leaves it unchanged)
+peer, err = client.UpdatePeer(ctx, "workspace-id", "user-123", honcho.PeerUpdate{
+    Configuration: &honcho.PeerConfig{},
+})
+
 // Get sessions for a peer
 sessions, err := client.GetSessionsForPeer(ctx, "workspace-id", "user-123", nil, &honcho.GetSessionsForPeerOptions{
     Page: 1,

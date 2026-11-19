@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"reflect"
 	"slices"
 	"strings"
 	"sync"
@@ -922,5 +923,102 @@ func TestGetSessionsForPeerReverse(t *testing.T) {
 
 			checkScopeRequest(t, received(), http.MethodPost, "/v3/workspaces/workspace/peers/alice/sessions", tt.wantQuery, `{}`)
 		})
+	}
+}
+
+// peerFields are the fields of a peer in the shape of upstream's Peer schema, less its
+// configuration.
+const peerFields = `"id":"alice","uid":"yTkg0JNCYKPlmpuCQAfqn","workspace_id":"workspace","created_at":"2026-11-18T16:09:28.620049Z","metadata":{}`
+
+// UpdatePeer sends a PUT request to the peer's path, with the configuration only when
+// Configuration is not nil: a nil one leaves the stored configuration unchanged, while any
+// other replaces it. An empty configuration is sent too, its nil ObserveMe as null, which
+// Honcho reads as unset: it clears the stored configuration. Regression test: Configuration
+// was a value left out of the request when empty, so an empty configuration meant to clear
+// the stored one was silently ignored.
+func TestUpdatePeerConfiguration(t *testing.T) {
+	metadata := json.RawMessage(`{"name":"Alice"}`)
+	tests := []struct {
+		name string
+		req  PeerUpdate
+		want string
+	}{
+		{name: "nil configuration", want: `{}`},
+		{name: "nil configuration with metadata", req: PeerUpdate{Metadata: metadata}, want: `{"metadata":{"name":"Alice"}}`},
+		{name: "empty configuration", req: PeerUpdate{Configuration: &PeerConfig{}}, want: `{"configuration":{"observe_me":null}}`},
+		{
+			name: "observe_me false",
+			req:  PeerUpdate{Configuration: &PeerConfig{ObserveMe: pointerTo(false)}},
+			want: `{"configuration":{"observe_me":false}}`,
+		},
+		{
+			name: "observe_me true with metadata",
+			req:  PeerUpdate{Metadata: metadata, Configuration: &PeerConfig{ObserveMe: pointerTo(true)}},
+			want: `{"metadata":{"name":"Alice"},"configuration":{"observe_me":true}}`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client, received := scopeServer(t, http.StatusOK, `{`+peerFields+`,"configuration":{}}`)
+
+			if _, err := client.UpdatePeer(t.Context(), "workspace", "alice", tt.req); err != nil {
+				t.Fatalf("UpdatePeer: %v", err)
+			}
+
+			checkScopeRequest(t, received(), http.MethodPut, "/v3/workspaces/workspace/peers/alice", url.Values{}, tt.want)
+		})
+	}
+}
+
+// GetOrCreatePeer sends a configuration holding observe_me alone, and leaves out an empty
+// one, the default. Regression test: PeerConfig had an ObserveOthers field, sent as null
+// whenever the configuration was, which Honcho stores for a peer but never reads: observing
+// other peers is a session membership setting, so a peer configured to observe others did
+// not.
+func TestGetOrCreatePeerConfiguration(t *testing.T) {
+	tests := []struct {
+		name string
+		req  PeerCreate
+		want string
+	}{
+		{name: "no configuration", req: PeerCreate{ID: "alice"}, want: `{"id":"alice"}`},
+		{
+			name: "observe_me false",
+			req:  PeerCreate{ID: "alice", Configuration: PeerConfig{ObserveMe: pointerTo(false)}},
+			want: `{"id":"alice","configuration":{"observe_me":false}}`,
+		},
+		{
+			name: "observe_me true",
+			req:  PeerCreate{ID: "alice", Configuration: PeerConfig{ObserveMe: pointerTo(true)}},
+			want: `{"id":"alice","configuration":{"observe_me":true}}`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client, received := scopeServer(t, http.StatusOK, `{`+peerFields+`,"configuration":{}}`)
+
+			if _, err := client.GetOrCreatePeer(t.Context(), "workspace", tt.req); err != nil {
+				t.Fatalf("GetOrCreatePeer: %v", err)
+			}
+
+			checkScopeRequest(t, received(), http.MethodPost, "/v3/workspaces/workspace/peers", url.Values{}, tt.want)
+		})
+	}
+}
+
+// A peer whose configuration holds observe_others, as a peer configured through an earlier
+// version of this client can, still decodes: observe_me is read, and observe_others, which
+// Honcho never reads for a peer, is dropped.
+func TestPeerConfigurationIgnoresObserveOthers(t *testing.T) {
+	client, _ := scopeServer(t, http.StatusOK, `{`+peerFields+`,"configuration":{"observe_me":false,"observe_others":true}}`)
+
+	peer, err := client.GetOrCreatePeer(t.Context(), "workspace", PeerCreate{ID: "alice"})
+	if err != nil {
+		t.Fatalf("GetOrCreatePeer: %v", err)
+	}
+
+	if want := (PeerConfig{ObserveMe: pointerTo(false)}); !reflect.DeepEqual(peer.Configuration, want) {
+		got, _ := json.Marshal(peer.Configuration)
+		t.Errorf(`Configuration = %s, want {"observe_me":false}`, got)
 	}
 }
