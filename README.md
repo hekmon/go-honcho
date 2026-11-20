@@ -601,6 +601,13 @@ if err != nil {
         }
         return
     }
+
+    // Check for any other status, such as a 404, through its status code
+    var httpErr *honcho.HTTPError
+    if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound {
+        log.Printf("Not found: %s", httpErr.Body)
+        return
+    }
     
     // Handle other errors
     log.Printf("API error: %v", err)
@@ -613,7 +620,7 @@ if err != nil {
 | Error Type | HTTP Status | Description |
 |------------|-------------|-------------|
 | `HTTPValidationError` | 422 | Request validation failed: Honcho's own errors in `Message`, FastAPI's request validation errors in `Detail` |
-| Generic error | 4xx/5xx | Other API errors with status code |
+| `HTTPError` | Any but 200, 201, 202, 204 and 422 | A status the client does not handle, such as 400, 401, 404 or 500. It holds `StatusCode` and `Status` of the response, `Method` and `URL` of the request, and `Body`, the response's body as received. Tell statuses apart by `StatusCode`, not by the text of the error |
 
 ## Validation
 
@@ -824,6 +831,11 @@ if err != nil {
     var valErr *honcho.HTTPValidationError
     if errors.As(err, &valErr) {
         // Handle validation error
+        return
+    }
+    var httpErr *honcho.HTTPError
+    if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound {
+        // Handle a missing resource
         return
     }
     log.Printf("API error: %v", err)

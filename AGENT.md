@@ -408,6 +408,23 @@ type ValidationError struct {
     Ctx   any    `json:"ctx,omitempty"`
 }
 
+// ✅ Give every other status one error type, which callers tell apart by StatusCode
+// HTTPError is the error of a request Honcho answered with a status this client does not
+// handle: any status but 200, 201, 202, 204 and 422, a 422 being an *HTTPValidationError.
+// Test for it with errors.As, then read StatusCode: the text of Error is not part of the API.
+type HTTPError struct {
+    // StatusCode is the response's status code, such as http.StatusNotFound
+    StatusCode int
+    // Status is the response's status, such as "404 Not Found"
+    Status string
+    // Method is the request's method, such as http.MethodDelete
+    Method string
+    // URL is the request's URL, its password, if any, masked as url.URL.Redacted does
+    URL string
+    // Body is the response's body, as received. Honcho sends a JSON object whose detail is a text
+    Body []byte
+}
+
 // ✅ Handle ALL HTTP status codes from the API docs in request()
 case http.StatusUnprocessableEntity:
     // The body is read once, then decoded from what was read
@@ -423,6 +440,17 @@ case http.StatusUnprocessableEntity:
     }
     err = &valErr // Error() already starts with "validation error: "
     return
+default:
+    // Any other status: a read error is ignored, and what was read is kept
+    data, _ := io.ReadAll(resp.Body)
+    err = &HTTPError{
+        StatusCode: resp.StatusCode,
+        Status:     resp.Status,
+        Method:     req.Method,
+        URL:        req.URL.Redacted(),
+        Body:       data,
+    }
+    return // Error() does not say that the request failed: the caller's wrap does
 
 // ❌ Don't ignore error schemas or HTTP status codes from the API docs
 // ❌ Don't leave error responses as generic strings
@@ -844,18 +872,42 @@ err = fmt.Errorf("failed to create messages: %w", err)
 **Example error type implementation:**
 
 ```go
-// ✅ Complete error type with Error() method
-type NotFoundError struct {
-    ResourceType string
-    ResourceID   string
+// ✅ Complete error type with Error() method: one type for every status request()
+// does not handle, which callers tell apart by StatusCode
+// HTTPError is the error of a request Honcho answered with a status this client does not
+// handle: any status but 200, 201, 202, 204 and 422, a 422 being an *HTTPValidationError.
+// Test for it with errors.As, then read StatusCode: the text of Error is not part of the API.
+type HTTPError struct {
+    // StatusCode is the response's status code, such as http.StatusNotFound
+    StatusCode int
+    // Status is the response's status, such as "404 Not Found"
+    Status string
+    // Method is the request's method, such as http.MethodDelete
+    Method string
+    // URL is the request's URL, its password, if any, masked as url.URL.Redacted does
+    URL string
+    // Body is the response's body, as received. Honcho sends a JSON object whose detail is a text
+    Body []byte
 }
 
-func (e *NotFoundError) Error() string {
-    return fmt.Sprintf("%s not found: %s", e.ResourceType, e.ResourceID)
+// Error gives the method and URL of the request, the status of the response, then its
+// body trimmed of surrounding white space, unless nothing remains of it.
+func (e *HTTPError) Error() string {
+    text := e.Method + " " + e.URL + ": " + e.Status
+    if body := bytes.TrimSpace(e.Body); len(body) > 0 {
+        text += ": " + string(body)
+    }
+    return text
 }
 
-// Usage in method:
-err = fmt.Errorf("failed to get resource: %w", &NotFoundError{ResourceType: "peer", ResourceID: peerID})
+// In request handling, for any status it does not handle, returned as is:
+err = &HTTPError{StatusCode: resp.StatusCode, Status: resp.Status, Method: req.Method, URL: req.URL.Redacted(), Body: data}
+
+// In the API method calling request(), wrapped with what failed: Error() does not say it
+err = fmt.Errorf("failed to execute request: %w", err)
+// The error then reads: failed to execute request: DELETE https://api.honcho.dev/v3/workspaces/w/sessions/s: 404 Not Found: {"detail":"Session s not found in workspace w"}
+
+// ❌ Don't define one error type per status, such as a NotFoundError
 ```
 
 **Checking for specific error types:**
@@ -874,6 +926,13 @@ if errors.As(err, &valErr) {
     }
 }
 
+// ✅ Tell one status from another by HTTPError's StatusCode
+var httpErr *HTTPError
+if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound {
+    // Handle the missing resource: httpErr.Body holds Honcho's detail
+}
+
+// ❌ Don't match the text of the error: strings.Contains(err.Error(), "404 Not Found")
 // ❌ Don't use type assertions without checking
 if valErr, ok := err.(*HTTPValidationError); ok {  // breaks with wrapped errors!
 ```

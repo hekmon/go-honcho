@@ -42,6 +42,101 @@ func TestValidationError(t *testing.T) {
 	}
 }
 
+// Any status but 200, 201, 202, 204 and 422, such as a 404 or a 502, comes back
+// as an *HTTPError holding the status, the request's method and URL, and the
+// body as received. Its text gives them on one line, the body trimmed and left
+// out when empty, and the wrapped message says once that the request failed. A
+// password in the base URL is masked in the URL and in the text. Regression
+// test: such a status came back as a text of three lines, "Client request
+// failed: 404 Not Found", the URL, password included, and the body, which
+// callers searched for "404 Not Found", and the wrapped message said twice that
+// the request failed.
+func TestHTTPError(t *testing.T) {
+	const (
+		detail = `{"detail":"Session s not found in workspace w"}`
+		secret = "secret" // the password of a base URL
+	)
+	deleteSession := func(ctx context.Context, client *Client) error { return client.DeleteSession(ctx, "w", "s") }
+	tests := []struct {
+		name       string
+		user       *url.Userinfo // the user of the base URL, if any
+		call       func(ctx context.Context, client *Client) error
+		statusCode int    // the status the server answers with
+		status     string // its text, as the client reads it
+		body       string // the body the server sends
+		method     string // the method of the request
+		url        string // the URL of the error, %s standing for the server's host
+		text       string // the text of the error, %s standing for that URL
+	}{
+		{
+			name:       "404 with a detail",
+			call:       deleteSession,
+			statusCode: http.StatusNotFound,
+			status:     "404 Not Found",
+			body:       detail + "\n",
+			method:     http.MethodDelete,
+			url:        "http://%s/v3/workspaces/w/sessions/s",
+			text:       "failed to execute request: DELETE %s: 404 Not Found: " + detail,
+		},
+		{
+			name: "502 without a body",
+			call: func(ctx context.Context, client *Client) error {
+				return errorOf(client.GetOrCreateWorkspace(ctx, CreateWorkspaceRequest{ID: "w"}))
+			},
+			statusCode: http.StatusBadGateway,
+			status:     "502 Bad Gateway",
+			method:     http.MethodPost,
+			url:        "http://%s/v3/workspaces",
+			text:       "failed to execute request: POST %s: 502 Bad Gateway",
+		},
+		{
+			name:       "404 to a base URL holding a password",
+			user:       url.UserPassword("user", secret),
+			call:       deleteSession,
+			statusCode: http.StatusNotFound,
+			status:     "404 Not Found",
+			method:     http.MethodDelete,
+			url:        "http://user:xxxxx@%s/v3/workspaces/w/sessions/s",
+			text:       "failed to execute request: DELETE %s: 404 Not Found",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(tt.statusCode)
+				fmt.Fprint(w, tt.body)
+			}))
+			defer server.Close()
+			u, _ := url.Parse(server.URL)
+			u.User = tt.user
+
+			err := tt.call(t.Context(), New(&Options{BaseURL: u}))
+
+			var httpErr *HTTPError
+			if !errors.As(err, &httpErr) {
+				t.Fatalf("error = %v, want an *HTTPError", err)
+			}
+			wantURL := fmt.Sprintf(tt.url, u.Host)
+			if httpErr.StatusCode != tt.statusCode || httpErr.Status != tt.status {
+				t.Errorf("StatusCode, Status = %d, %q, want %d, %q", httpErr.StatusCode, httpErr.Status, tt.statusCode, tt.status)
+			}
+			if httpErr.Method != tt.method || httpErr.URL != wantURL {
+				t.Errorf("Method, URL = %s, %s, want %s, %s", httpErr.Method, httpErr.URL, tt.method, wantURL)
+			}
+			if string(httpErr.Body) != tt.body {
+				t.Errorf("Body = %q, want %q", httpErr.Body, tt.body)
+			}
+			if want := fmt.Sprintf(tt.text, wantURL); err.Error() != want {
+				t.Errorf("error = %q, want %q", err, want)
+			}
+			if strings.Contains(httpErr.URL, secret) || strings.Contains(err.Error(), secret) {
+				t.Errorf("URL = %s, error = %v, want neither to hold the password", httpErr.URL, err)
+			}
+		})
+	}
+}
+
 // The error of a failed request keeps its cause in its chain, for errors.Is and
 // errors.As to find through the wrapping of any method, and its message says once
 // that the request failed. Regression test: request flattened its causes into

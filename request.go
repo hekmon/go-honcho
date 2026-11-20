@@ -136,21 +136,16 @@ func (c *Client) request(ctx context.Context, method string, requestURL *url.URL
 		err = &valErr
 		return
 	default:
-		var builder strings.Builder
-		// line 1
-		builder.WriteString("Client request failed: ")
-		builder.WriteString(resp.Status)
-		builder.WriteRune('\n')
-		// line 2
-		builder.WriteString("URL: ")
-		builder.WriteString(req.URL.String())
-		builder.WriteRune('\n')
-		// line 3
+		// Any other status is an *HTTPError, holding the body as received: a read
+		// error is ignored, and what was read is kept.
 		data, _ := io.ReadAll(resp.Body)
-		builder.Write(data)
-		builder.WriteRune('\n')
-		// return full error
-		err = errors.New(builder.String())
+		err = &HTTPError{
+			StatusCode: resp.StatusCode,
+			Status:     resp.Status,
+			Method:     req.Method,
+			URL:        req.URL.Redacted(),
+			Body:       data,
+		}
 		return
 	}
 	if result == nil {
@@ -198,6 +193,32 @@ func setContentType(headers http.Header, contentType string) http.Header {
 		headers.Set("Content-Type", contentType)
 	}
 	return headers
+}
+
+// HTTPError is the error of a request Honcho answered with a status this client does not
+// handle: any status but 200, 201, 202, 204 and 422, a 422 being an *HTTPValidationError.
+// Test for it with errors.As, then read StatusCode: the text of Error is not part of the API.
+type HTTPError struct {
+	// StatusCode is the response's status code, such as http.StatusNotFound
+	StatusCode int
+	// Status is the response's status, such as "404 Not Found"
+	Status string
+	// Method is the request's method, such as http.MethodDelete
+	Method string
+	// URL is the request's URL, its password, if any, masked as url.URL.Redacted does
+	URL string
+	// Body is the response's body, as received. Honcho sends a JSON object whose detail is a text
+	Body []byte
+}
+
+// Error gives the method and URL of the request, the status of the response, then its
+// body trimmed of surrounding white space, unless nothing remains of it.
+func (e *HTTPError) Error() string {
+	text := e.Method + " " + e.URL + ": " + e.Status
+	if body := bytes.TrimSpace(e.Body); len(body) > 0 {
+		text += ": " + string(body)
+	}
+	return text
 }
 
 // HTTPValidationError represents a 422 validation error response. Its detail
