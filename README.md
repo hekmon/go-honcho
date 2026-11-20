@@ -646,6 +646,9 @@ if err != nil {
 - **ID format** - Must contain only letters, numbers, underscores, or hyphens
 - **Length constraints** - IDs must be 512 characters or less (506 for scopes)
 - **Numeric constraints** - Pagination and limits have min/max values
+- **Limits from server settings** - The length of message content and peer chat queries is not checked, because their limits are server settings: `MAX_MESSAGE_SIZE`, 25000 characters by default, and `DIALECTIC_MAX_QUERY_LENGTH`, 10000 by default. The server answers longer text with a 422
+
+**Note on NUL characters:** Honcho removes NUL characters (U+0000) from the text it stores, so text read back can differ from what was sent: message content `"a\x00b"` comes back `"ab"`. It removes them from message and conclusion content, from each entry of a peer card, from every key and string value of metadata, nested ones included, and from configuration strings such as custom instructions. It also removes them from chat and search queries.
 
 ## Pagination
 

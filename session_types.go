@@ -15,7 +15,8 @@ type SessionCreate struct {
 	// ID is the session identifier (required, 1-512 characters, pattern: ^[a-zA-Z0-9_-]+$)
 	ID string `json:"id"`
 	// Metadata is optional metadata for the session. If the session already exists, it replaces the
-	// stored metadata: an empty object, {}, erases it
+	// stored metadata: an empty object, {}, erases it. Honcho removes NUL characters from its keys
+	// and strings
 	Metadata json.RawMessage `json:"metadata,omitempty"`
 	// Peers is optional map of peer IDs to their session-level configuration. If the session already
 	// exists, members not listed stay. A peer already a member keeps its stored configuration, as
@@ -50,7 +51,8 @@ func (req SessionCreate) Validate() error {
 
 // SessionUpdate represents the request body for updating a session
 type SessionUpdate struct {
-	// Metadata is optional metadata to update
+	// Metadata is optional metadata to update. Honcho removes NUL characters from its keys and
+	// strings
 	Metadata json.RawMessage `json:"metadata,omitempty"`
 	// Configuration is optional configuration to update: a section that is sent replaces the stored section of that name, other sections are kept
 	Configuration *SessionConfiguration `json:"configuration,omitempty"`
@@ -171,7 +173,8 @@ type GetSessionsOptions struct {
 
 // GetSessionContextOptions represents optional parameters for GetSessionContext
 type GetSessionContextOptions struct {
-	// Tokens is number of tokens to use for the context (maximum: 100000)
+	// Tokens is number of tokens to use for the context (maximum: the server's
+	// GET_CONTEXT_MAX_TOKENS setting, 100000 by default)
 	Tokens *int
 	// SearchQuery is a query string used to fetch semantically relevant conclusions
 	SearchQuery *string

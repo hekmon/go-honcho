@@ -29,7 +29,8 @@ type ScopeCreate struct {
 	// ID is the unprefixed scope name (required, 1-506 characters, pattern: ^[a-zA-Z0-9_-]+$)
 	ID string `json:"id"`
 	// Metadata is optional metadata for the scope. On a scope that already exists, metadata that
-	// differs from the stored metadata overwrites it: leave it nil to keep what is stored
+	// differs from the stored metadata overwrites it: leave it nil to keep what is stored. Honcho
+	// removes NUL characters from its keys and strings
 	Metadata json.RawMessage `json:"metadata,omitempty"`
 }
 

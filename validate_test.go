@@ -2,6 +2,8 @@ package honcho
 
 import (
 	"encoding/json"
+	"net/http"
+	"net/url"
 	"strings"
 	"testing"
 )
@@ -45,11 +47,10 @@ func TestValidateID(t *testing.T) {
 	}
 }
 
-// Message content, chat queries and conclusion content are accepted up to their
-// limit in characters, as upstream counts them, and refused when longer, however
-// many bytes each character takes. Regression test: Validate counted bytes, so
-// text holding multi-byte characters was refused well below the limit and never
-// reached the server.
+// Conclusion content is accepted up to its limit in characters, as upstream counts
+// them, and refused when longer, however many bytes each character takes.
+// Regression test: Validate counted bytes, so text holding multi-byte characters
+// was refused well below the limit and never reached the server.
 func TestValidateTextLength(t *testing.T) {
 	requests := []struct {
 		name     string
@@ -57,12 +58,6 @@ func TestValidateTextLength(t *testing.T) {
 		errMsg   string
 		validate func(text string) error
 	}{
-		{"MessageCreate", 25000, "content must be 25000 characters or less", func(text string) error {
-			return MessageCreate{Content: text, PeerID: "peer"}.Validate()
-		}},
-		{"DialecticOptions", 10000, "query must be 10000 characters or less", func(text string) error {
-			return DialecticOptions{Query: text}.Validate()
-		}},
 		{"ConclusionCreate", 65535, "content must be 65535 characters or less", func(text string) error {
 			return ConclusionCreate{Content: text, ObserverID: "observer", ObservedID: "observed"}.Validate()
 		}},
@@ -90,6 +85,37 @@ func TestValidateTextLength(t *testing.T) {
 			})
 		}
 	}
+}
+
+// Message content and peer chat queries longer than Honcho's default limits pass
+// Validate and reach the server in full, as both limits are server settings that
+// a deployment can raise: MAX_MESSAGE_SIZE, 25000 characters by default, and
+// DIALECTIC_MAX_QUERY_LENGTH, 10000 by default. Regression test: Validate refused
+// longer text, so it never reached a server configured to accept it.
+func TestValidateTextOverDefaultLimit(t *testing.T) {
+	t.Run("message content", func(t *testing.T) {
+		content := strings.Repeat("a", 50000)
+		client, received := scopeServer(t, http.StatusCreated, `[]`)
+
+		req := MessageBatchCreate{Messages: []MessageCreate{{Content: content, PeerID: "alice"}}}
+		if _, err := client.CreateMessagesForSession(t.Context(), "workspace", "session", req); err != nil {
+			t.Fatalf("CreateMessagesForSession() error = %v, want nil", err)
+		}
+
+		checkScopeRequest(t, received(), http.MethodPost, "/v3/workspaces/workspace/sessions/session/messages", url.Values{},
+			`{"messages":[{"content":"`+content+`","peer_id":"alice"}]}`)
+	})
+	t.Run("peer chat query", func(t *testing.T) {
+		query := strings.Repeat("a", 20000)
+		client, received := scopeServer(t, http.StatusOK, `{"content":"ok"}`)
+
+		if _, err := client.Chat(t.Context(), "workspace", "alice", DialecticOptions{Query: query}); err != nil {
+			t.Fatalf("Chat() error = %v, want nil", err)
+		}
+
+		checkScopeRequest(t, received(), http.MethodPost, "/v3/workspaces/workspace/peers/alice/chat", url.Values{},
+			`{"query":"`+query+`"}`)
+	})
 }
 
 // Message content may be empty, as upstream declares it with min_length=0, while

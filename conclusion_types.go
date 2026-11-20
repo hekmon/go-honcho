@@ -44,7 +44,8 @@ type Conclusion struct {
 
 // ConclusionCreate is the schema for creating a single conclusion.
 type ConclusionCreate struct {
-	// Content is the text content of the conclusion (required, 1-65535 characters)
+	// Content is the text content of the conclusion (required, 1-65535 characters). Honcho counts
+	// NUL characters toward this limit, then removes them
 	Content string `json:"content"`
 	// ObserverID is the peer making the conclusion (required)
 	ObserverID string `json:"observer_id"`

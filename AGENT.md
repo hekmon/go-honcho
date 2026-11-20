@@ -1233,13 +1233,15 @@ if req.Distance != nil && (*req.Distance < 0 || *req.Distance > 1) {
 
 ```go
 // ✅ Limits count characters, so use utf8.RuneCountInString
-if utf8.RuneCountInString(req.Content) > 25000 {
-    return errors.New("content must be 25000 characters or less")
+if utf8.RuneCountInString(req.Content) > 65535 {
+    return errors.New("content must be 65535 characters or less")
 }
 
 // ❌ Don't use len: it counts bytes, so multi-byte text is refused below the limit
-if len(req.Content) > 25000 {
+if len(req.Content) > 65535 {
 ```
+
+**Check only limits fixed in Honcho's schema.** A limit Honcho takes from a setting (`MAX_MESSAGE_SIZE`, `DIALECTIC_MAX_QUERY_LENGTH`, `GET_CONTEXT_MAX_TOKENS`) shows in the OpenAPI spec with its default value, but a deployment can change it. In Honcho's source, such a limit names the setting instead of a number, as in `max_length=settings.MAX_MESSAGE_SIZE`. Document the setting and its default, and leave the check to the server's 422.
 
 **Copy exact constraints from the OpenAPI spec - do not approximate:**
 
@@ -1278,7 +1280,7 @@ func (req MessageSearchOptions) Validate() error {
 - ✅ Verify all string constraints (length, pattern) against OpenAPI spec
 - ✅ Verify all required fields match the `required` array in the spec
 - ✅ Don't add validation for optional fields (server handles those)
-- ✅ Copy constraint values directly from the spec, don't guess
+- ✅ Copy constraint values directly from the spec, don't guess, except a limit Honcho takes from a setting: document it, don't check it
 
 ### Struct Field Documentation
 
@@ -1735,11 +1737,11 @@ grep "type.*struct" peer.go        # Should find nothing
 - ✅ Request body schema matches the spec (all fields, types, omitempty)
 - ✅ Response body schema matches the spec (all fields, types)
 - ✅ All HTTP status codes are handled (200, 201, 202, 204, 422, etc.)
-- ✅ Error response schemas are implemented (HTTPValidationError, ValidationError)
+- ✅ Error response schemas are implemented (HTTPValidationError, ValidationError), and HTTPError covers every status but 200, 201, 202, 204 and 422
 
 **Validation precision:**
 - ✅ Numeric constraints (min/max) match the spec exactly
-- ✅ String constraints (length, pattern) match the spec exactly
+- ✅ String constraints (length, pattern) match the spec exactly, except a limit Honcho takes from a setting: document it, don't check it
 - ✅ Required fields match the `required` array in the spec
 - ✅ Default values are documented in struct field comments
 
@@ -1814,7 +1816,7 @@ grep "type.*struct" peer.go        # Should find nothing
 - ✅ Use `any` instead of `interface{}`
 - ✅ Use pointers for optional nested structs
 - ✅ Allow 0 for optional int fields where 0 means "use server default"
-- ✅ Copy validation constraints exactly from the OpenAPI spec
+- ✅ Copy validation constraints exactly from the OpenAPI spec, except a limit Honcho takes from a setting: document it, don't check it
 - ✅ Implement ALL schemas and HTTP status codes from the API docs
 
 **Multipart Forms:**

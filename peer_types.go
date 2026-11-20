@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"regexp"
 	"time"
-	"unicode/utf8"
 )
 
 // peerIDPattern validates peer ID format
@@ -36,7 +35,9 @@ type PeerConfig struct {
 
 // PeerCreate represents the request body for creating/getting a peer
 type PeerCreate struct {
-	ID            string          `json:"id"`
+	ID string `json:"id"`
+	// Metadata is optional metadata for the peer. Honcho removes NUL characters from its keys and
+	// strings
 	Metadata      json.RawMessage `json:"metadata,omitempty"`
 	Configuration PeerConfig      `json:"configuration,omitzero"`
 }
@@ -101,6 +102,8 @@ type PagePeer struct {
 
 // PeerUpdate represents the request body for updating a peer
 type PeerUpdate struct {
+	// Metadata is optional metadata to update. Honcho removes NUL characters from its keys and
+	// strings
 	Metadata json.RawMessage `json:"metadata,omitempty"`
 	// Configuration replaces the entire stored configuration. An empty non-nil value clears it.
 	// A nil value leaves it unchanged.
@@ -163,6 +166,7 @@ type PeerCardResponse struct {
 type PeerCardSet struct {
 	// PeerCard replaces the whole peer card. An empty non-nil list clears the card.
 	// A nil list is refused by Validate, as it would be sent as null, which upstream refuses.
+	// Honcho removes NUL characters from each entry.
 	PeerCard []string `json:"peer_card"`
 }
 
@@ -278,7 +282,8 @@ type DialecticOptions struct {
 	Scope *ScopeOption `json:"scope,omitempty"`
 	// Target is optional peer to get the representation for, from the perspective of this peer
 	Target *string `json:"target,omitempty"`
-	// Query is the dialectic API prompt (1-10000 characters)
+	// Query is the dialectic API prompt (required). Honcho refuses with a 422 a query longer than
+	// its DIALECTIC_MAX_QUERY_LENGTH setting, 10000 characters by default
 	Query string `json:"query"`
 	// Stream is whether to stream the response (default: false). ChatStream sets it and Chat refuses it
 	Stream bool `json:"stream,omitempty"`
@@ -301,9 +306,6 @@ type DialecticOptions struct {
 func (req DialecticOptions) Validate() error {
 	if req.Query == "" {
 		return errors.New("query is required")
-	}
-	if utf8.RuneCountInString(req.Query) > 10000 {
-		return errors.New("query must be 10000 characters or less")
 	}
 	// A non-nil empty filter map would silently be left out of the request by omitempty, turning a
 	// restriction the caller asked for into unrestricted recall.

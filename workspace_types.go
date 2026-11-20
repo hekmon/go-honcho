@@ -10,7 +10,9 @@ import (
 
 // CreateWorkspaceRequest represents the request body for creating/getting a workspace
 type CreateWorkspaceRequest struct {
-	ID            string                  `json:"id"`
+	ID string `json:"id"`
+	// Metadata is optional metadata for the workspace. Honcho removes NUL characters from its keys
+	// and strings
 	Metadata      json.RawMessage         `json:"metadata,omitempty"`
 	Configuration *WorkspaceConfiguration `json:"configuration,omitempty"`
 }
@@ -97,6 +99,8 @@ type WorkspaceGetRequest struct {
 
 // UpdateWorkspaceRequest represents the request body for updating a workspace
 type UpdateWorkspaceRequest struct {
+	// Metadata is optional metadata to update. Honcho removes NUL characters from its keys and
+	// strings
 	Metadata json.RawMessage `json:"metadata,omitempty"`
 	// Configuration replaces the entire stored configuration. An empty non-nil value clears it.
 	// A nil value leaves it unchanged.

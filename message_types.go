@@ -8,7 +8,6 @@ import (
 	"mime"
 	"strings"
 	"time"
-	"unicode/utf8"
 )
 
 // Message represents a message in a session
@@ -33,11 +32,14 @@ type Message struct {
 
 // MessageCreate represents the request body for creating a single message
 type MessageCreate struct {
-	// Content is the message content (0-25000 characters, may be empty)
+	// Content is the message content, which may be empty. Honcho refuses with a 422 a content
+	// longer than its MAX_MESSAGE_SIZE setting, 25000 characters by default, counting NUL
+	// characters, which it then removes
 	Content string `json:"content"`
 	// PeerID is the ID of the peer sending the message (required)
 	PeerID string `json:"peer_id"`
-	// Metadata is optional metadata for the message
+	// Metadata is optional metadata for the message. Honcho removes NUL characters from its keys
+	// and strings
 	Metadata json.RawMessage `json:"metadata,omitempty"`
 	// Configuration is optional message-level configuration
 	Configuration *MessageConfiguration `json:"configuration,omitempty"`
@@ -47,9 +49,6 @@ type MessageCreate struct {
 
 // Validate checks that mandatory fields are valid
 func (req MessageCreate) Validate() error {
-	if utf8.RuneCountInString(req.Content) > 25000 {
-		return errors.New("content must be 25000 characters or less")
-	}
 	if req.PeerID == "" {
 		return errors.New("peer_id is required")
 	}
@@ -87,7 +86,8 @@ type MessageGet struct {
 
 // MessageUpdate represents the request body for updating a message
 type MessageUpdate struct {
-	// Metadata is optional metadata to update (will overwrite existing metadata)
+	// Metadata is optional metadata to update (will overwrite existing metadata). Honcho removes NUL
+	// characters from its keys and strings
 	Metadata json.RawMessage `json:"metadata,omitempty"`
 }
 
@@ -162,7 +162,8 @@ type MessageUpload struct {
 	// Metadata is optional metadata for the messages, a JSON object, sent as given as the metadata
 	// form field when not empty. Leave it empty for no metadata: Validate refuses a non-empty value
 	// that is not a JSON object, as the server would otherwise silently drop invalid JSON, creating
-	// the messages without metadata, and store null as no metadata
+	// the messages without metadata, and store null as no metadata. Honcho removes NUL characters
+	// from its keys and strings
 	Metadata json.RawMessage `json:"metadata,omitempty"`
 	// Configuration is optional message-level configuration, sent marshalled to JSON as the
 	// configuration form field when not nil
