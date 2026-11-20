@@ -1408,8 +1408,10 @@ What a `nil` does depends on the endpoint:
 |-------------------------|-----------------|
 | `SessionPeerConfig` through `SetPeerConfig` | Keeps the stored value, like omitting the field |
 | `SessionPeerConfig` through `AddPeersToSession`, peer already in the session | Whole sent configuration ignored: stored values stay, even for fields sent as `true` or `false` |
+| `SessionPeerConfig` through `GetOrCreateSession`, peer already in the session | Same as through `AddPeersToSession` |
 | Workspace configuration through `UpdateWorkspace` | Whole stored configuration replaced: anything not sent is erased |
 | Session configuration through `UpdateSession` | A sent section replaces the stored section of that name, so a `nil` field inside it is erased; sections not sent are kept |
+| Session configuration through `GetOrCreateSession`, existing session | Same as through `UpdateSession` |
 | `PeerConfig` through `UpdatePeer` | Whole stored configuration replaced: `nil` is stored as `null` |
 
 To change one field of a workspace or session configuration section, send the whole section with its other values. For a workspace, also send the other sections, because `UpdateWorkspace` replaces the whole configuration.

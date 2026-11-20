@@ -8,10 +8,36 @@ import (
 	"strconv"
 )
 
-// GetOrCreateSession gets a Session by ID or creates a new Session with the given ID.
+// GetOrCreateSession gets a Session by ID or creates a new Session with the given ID, creating
+// the workspace too if it does not exist.
 //
-// If Session ID is provided as a parameter, it verifies the Session is in the Workspace.
-// Otherwise, it uses the session_id from the JWT for verification.
+// On a session that already exists, each field that is sent changes it, and each field left out
+// keeps what is stored:
+//   - Metadata replaces the stored metadata: an empty object, {}, erases it.
+//   - Configuration is merged per section, as UpdateSession does: a sent section replaces the
+//     stored section of that name, so a field left nil inside it is erased. Sections not sent are
+//     kept, and an empty configuration changes nothing.
+//   - Peers makes each listed peer a member, creating it if missing, and members not listed stay
+//     members. A peer already a member keeps its stored configuration and the sent one is ignored,
+//     as with AddPeersToSession. A peer that had left rejoins with the sent configuration.
+//   - Scopes adds the session to the listed scopes, as for a new session.
+//
+// After DeleteSession, Honcho answers 404 for the session ID until its queue has run the deletion.
+// GetOrCreateSession then creates a new, empty session with that ID. With Honcho's default
+// settings, the deriver backs off to 30 seconds between polls on an idle queue, so the deletion
+// can take tens of seconds to run. Without a deriver, the deletion never runs. As
+// GetOrCreateSession creates a missing workspace or session, its 404 means a pending deletion,
+// except for a scope-scoped key whose scope does not exist. No other route shows a pending
+// deletion: GetSessions leaves out inactive sessions, GetQueueStatus does not count deletions,
+// and no route reads a single session.
+//
+// A session-scoped key reaches only its own session: any other ID gets a 401. Peer- and
+// scope-scoped keys can create a new session. On an existing session, a peer-scoped key's peer
+// must already be a member, even if the key lists it in Peers, and a scope-scoped key's scope
+// must hold the session, or they get a 401; both get one for sending Metadata or Configuration,
+// and a scope-scoped key also for Peers. A peer-scoped key may name only its own peer in Peers,
+// or it gets a 401, and Scopes requires a workspace- or admin-level key, except that a
+// scope-scoped key may name its own scope.
 //
 // https://docs.honcho.dev/v3/api-reference/endpoint/sessions/get-or-create-session
 func (c *Client) GetOrCreateSession(ctx context.Context, workspaceID string, req SessionCreate) (result *Session, err error) {
@@ -112,6 +138,10 @@ func (c *Client) UpdateSession(ctx context.Context, workspaceID, sessionID strin
 //
 // The Session is marked as inactive immediately and returns 202 Accepted. The actual
 // deletion of all related data happens asynchronously via the queue with retry support.
+//
+// Until the queued deletion has run, the session ID answers 404 to GetOrCreateSession, which
+// does not create a new session before then, and to UpdateSession and DeleteSession, as for a
+// session that does not exist. See GetOrCreateSession for how long that lasts.
 //
 // This action cannot be undone.
 //

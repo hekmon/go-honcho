@@ -14,11 +14,16 @@ var sessionIDPattern = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 type SessionCreate struct {
 	// ID is the session identifier (required, 1-512 characters, pattern: ^[a-zA-Z0-9_-]+$)
 	ID string `json:"id"`
-	// Metadata is optional metadata for the session
+	// Metadata is optional metadata for the session. If the session already exists, it replaces the
+	// stored metadata: an empty object, {}, erases it
 	Metadata json.RawMessage `json:"metadata,omitempty"`
-	// Peers is optional map of peer IDs to their session-level configuration
+	// Peers is optional map of peer IDs to their session-level configuration. If the session already
+	// exists, members not listed stay. A peer already a member keeps its stored configuration, as
+	// with AddPeersToSession, and a peer that had left rejoins with the sent configuration
 	Peers map[string]*SessionPeerConfig `json:"peers,omitempty"`
-	// Configuration is optional session-level configuration
+	// Configuration is optional session-level configuration. If the session already exists, it is
+	// merged as by UpdateSession: a section that is sent replaces the stored section of that name,
+	// so a field left nil inside it is erased, and other sections are kept
 	Configuration *SessionConfiguration `json:"configuration,omitempty"`
 	// Scopes is the optional names of the scopes to add this session to (maximum: 100), even if the
 	// session already exists. A scope that does not exist is created. If the session already has

@@ -283,7 +283,8 @@ for chunk, err := range client.ChatStream(ctx, "workspace-id", "user-123", honch
 ### Session Operations
 
 ```go
-// Create or get a session
+// Create or get a session. For an existing session, sent metadata replaces the stored
+// metadata, and a sent configuration is merged per section
 session, err := client.GetOrCreateSession(ctx, "workspace-id", honcho.SessionCreate{
     ID:       "my-session",
     Metadata: json.RawMessage(`{"topic": "Customer Support"}`),
@@ -308,7 +309,8 @@ session, err = client.UpdateSession(ctx, "workspace-id", "session-id", honcho.Se
     Metadata: json.RawMessage(`{"topic": "Updated Topic"}`),
 })
 
-// Delete a session
+// Delete a session. Its ID answers 404, even to GetOrCreateSession, until Honcho's
+// queue has run the deletion
 err = client.DeleteSession(ctx, "workspace-id", "session-id")
 
 // Clone a session
